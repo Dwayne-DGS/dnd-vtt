@@ -4,12 +4,22 @@ export function initMap(socket) {
   const canvas = document.getElementById("map-canvas");
   const ctx = canvas.getContext("2d");
 
-  let tokens = [];          // {id,label,color,x,y}
+  let tokens = [];          // {id,label,color,img,x,y}
   let mapImg = null;
   let dragging = null;      // token being dragged
   let offset = { x: 0, y: 0 };
 
   const TOKEN_R = 22;
+  const imgCache = new Map(); // url -> HTMLImageElement
+  function getImg(url) {
+    if (imgCache.has(url)) return imgCache.get(url);
+    const im = new Image();
+    im.crossOrigin = "anonymous";
+    im.onload = draw;        // redraw once it arrives
+    im.src = url;
+    imgCache.set(url, im);
+    return im;
+  }
 
   function resize() {
     canvas.width = canvas.clientWidth;
@@ -29,18 +39,34 @@ export function initMap(socket) {
       drawGrid();
     }
     for (const t of tokens) {
-      ctx.beginPath();
-      ctx.arc(t.x, t.y, TOKEN_R, 0, Math.PI * 2);
-      ctx.fillStyle = t.color;
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "rgba(0,0,0,0.5)";
-      ctx.stroke();
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 13px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(t.label.slice(0, 3), t.x, t.y);
+      const im = t.img ? getImg(t.img) : null;
+      if (im && im.complete && im.naturalWidth) {
+        // Draw the portrait clipped into a circle.
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, TOKEN_R, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(im, t.x - TOKEN_R, t.y - TOKEN_R, TOKEN_R * 2, TOKEN_R * 2);
+        ctx.restore();
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, TOKEN_R, 0, Math.PI * 2);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = t.color || "rgba(0,0,0,0.5)";
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, TOKEN_R, 0, Math.PI * 2);
+        ctx.fillStyle = t.color;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "rgba(0,0,0,0.5)";
+        ctx.stroke();
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 13px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(t.label.slice(0, 3), t.x, t.y);
+      }
     }
   }
 

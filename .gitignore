@@ -6,6 +6,9 @@ vtt.db
 vtt.db-shm
 vtt.db-wal
 
+# Uploaded images live on the server, not in git
+public/uploads/
+
 # The big self-contained installer is only needed for the no-GitHub method
 install-on-server.sh
 

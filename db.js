@@ -47,10 +47,14 @@ db.exec(`
   );
 `);
 
-// Migration: add the DM password column to existing databases that predate it.
+// Migrations: add columns to existing databases that predate them.
 const roomCols = db.prepare("PRAGMA table_info(rooms)").all().map((c) => c.name);
 if (!roomCols.includes("dm_password")) {
   db.exec("ALTER TABLE rooms ADD COLUMN dm_password TEXT");
+}
+const tokenCols = db.prepare("PRAGMA table_info(tokens)").all().map((c) => c.name);
+if (!tokenCols.includes("img")) {
+  db.exec("ALTER TABLE tokens ADD COLUMN img TEXT");
 }
 
 // --- Rooms -----------------------------------------------------------------
@@ -75,10 +79,10 @@ export function setDmPassword(roomId, pw) {
 // --- Tokens ----------------------------------------------------------------
 const _getTokens = db.prepare("SELECT * FROM tokens WHERE room_id = ?");
 const _upsertToken = db.prepare(`
-  INSERT INTO tokens (id, room_id, label, color, x, y)
-  VALUES (@id, @room_id, @label, @color, @x, @y)
+  INSERT INTO tokens (id, room_id, label, color, img, x, y)
+  VALUES (@id, @room_id, @label, @color, @img, @x, @y)
   ON CONFLICT(id) DO UPDATE SET
-    label = excluded.label, color = excluded.color,
+    label = excluded.label, color = excluded.color, img = excluded.img,
     x = excluded.x, y = excluded.y
 `);
 const _moveToken = db.prepare("UPDATE tokens SET x = ?, y = ? WHERE id = ?");

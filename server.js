@@ -7,6 +7,7 @@ import { Server } from "socket.io";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { randomUUID } from "crypto";
+import { createWriteStream, mkdirSync } from "fs";
 import { rollDice } from "./dice.js";
 import * as store from "./db.js";
 
@@ -19,6 +20,36 @@ const io = new Server(httpServer);
 
 app.use(express.static(join(__dirname, "public")));
 app.get("/health", (_req, res) => res.json({ ok: true }));
+
+// Image upload (maps & token portraits). Streams the raw request body to a file
+// under public/uploads and returns its public URL. Image types only, size-capped.
+// Note: setting a map / placing a token is still DM-gated over the socket, so an
+// uploaded image is inert until a DM actually uses it.
+const UPLOAD_DIR = join(__dirname, "public", "uploads");
+const MAX_UPLOAD = 10 * 1024 * 1024; // 10 MB
+app.post("/upload", (req, res) => {
+  const type = (req.headers["content-type"] || "").toLowerCase();
+  if (!type.startsWith("image/")) {
+    return res.status(400).json({ error: "Images only" });
+  }
+  const ext = (type.split("/")[1] || "png").replace(/[^a-z0-9]/g, "").slice(0, 5) || "png";
+  mkdirSync(UPLOAD_DIR, { recursive: true });
+  const fname = `${randomUUID()}.${ext}`;
+  const out = createWriteStream(join(UPLOAD_DIR, fname));
+  let size = 0, aborted = false;
+  req.on("data", (chunk) => {
+    size += chunk.length;
+    if (size > MAX_UPLOAD && !aborted) {
+      aborted = true;
+      out.destroy();
+      req.destroy();
+      res.status(413).json({ error: "File too large (max 10 MB)" });
+    }
+  });
+  req.pipe(out);
+  out.on("finish", () => { if (!aborted) res.json({ url: `/uploads/${fname}` }); });
+  out.on("error", () => { if (!aborted) res.status(500).json({ error: "Write failed" }); });
+});
 
 // Track display names and DM status in memory (cleared on restart).
 const names = new Map(); // socket.id -> name
@@ -92,13 +123,14 @@ io.on("connection", (socket) => {
   });
 
   // --- Tokens --------------------------------------------------------------
-  socket.on("addToken", ({ label, color }) => {
+  socket.on("addToken", ({ label, color, img }) => {
     if (!roomId || !amDM()) return; // only the DM places tokens
     const token = {
       id: randomUUID(),
       room_id: roomId,
       label: label || "?",
       color: color || "#c0392b",
+      img: img || null,
       x: 60,
       y: 60,
     };

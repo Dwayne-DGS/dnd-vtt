@@ -72,6 +72,52 @@ function join() {
     socket.emit("addToken", { label, color });
   });
 
+  // --- Image uploads (DM) --------------------------------------------------
+  // Streams a file to the server and returns its public URL.
+  async function uploadImage(file) {
+    const res = await fetch("/upload", {
+      method: "POST",
+      headers: { "content-type": file.type },
+      body: file,
+    });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error || "Upload failed");
+    }
+    return (await res.json()).url;
+  }
+
+  const mapFile = document.getElementById("map-file");
+  const portraitFile = document.getElementById("portrait-file");
+
+  document.getElementById("map-upload").addEventListener("click", () => mapFile.click());
+  mapFile.addEventListener("change", async () => {
+    const file = mapFile.files[0];
+    mapFile.value = "";
+    if (!file) return;
+    try {
+      const url = await uploadImage(file);
+      mapUrl.value = url;
+      socket.emit("setMap", url);
+      const name = prompt("Save this map to the library as:", file.name.replace(/\.[^.]+$/, ""));
+      if (name) socket.emit("saveMap", { name, url });
+    } catch (e) { alert(e.message); }
+  });
+
+  document.getElementById("add-portrait").addEventListener("click", () => portraitFile.click());
+  portraitFile.addEventListener("change", async () => {
+    const file = portraitFile.files[0];
+    portraitFile.value = "";
+    if (!file) return;
+    const label = prompt("Token label (e.g. character initials):", "PC");
+    if (label === null) return;
+    try {
+      const img = await uploadImage(file);
+      const color = "#" + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0");
+      socket.emit("addToken", { label, color, img });
+    } catch (e) { alert(e.message); }
+  });
+
   // --- Map library ---------------------------------------------------------
   document.getElementById("map-save").addEventListener("click", () => {
     const url = mapUrl.value.trim();

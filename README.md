@@ -3,9 +3,10 @@
 A lightweight, self-hosted live virtual tabletop for D&D 5e. Everyone who joins
 the same **room** shares one game in real time:
 
-- **Shared map + tokens** — set a battle-map image, add colored tokens, drag them
-  around. Moves appear instantly for every player. **Map library:** save multiple
-  named maps and switch with one click.
+- **Shared map + tokens** — set a battle-map image (paste a URL **or upload a file**),
+  add tokens (colored discs or **uploaded portrait images**), drag them around.
+  Moves appear instantly for every player. **Map library:** save multiple named
+  maps and switch with one click.
 - **Dice roller** — quick buttons (d20, d12, …) plus full notation like `2d6+3`
   or `3d10+2d4+1`. Rolls are broadcast to the whole table.
 - **Character sheets** — D&D 5e sheets (abilities, AC, HP, level) saved per room,
