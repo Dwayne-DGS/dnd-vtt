@@ -49,9 +49,13 @@ db.exec(`
 
 // Migrations: add columns to existing databases that predate them.
 const roomCols = db.prepare("PRAGMA table_info(rooms)").all().map((c) => c.name);
-if (!roomCols.includes("dm_password")) {
-  db.exec("ALTER TABLE rooms ADD COLUMN dm_password TEXT");
-}
+const addRoomCol = (name) => { if (!roomCols.includes(name)) db.exec(`ALTER TABLE rooms ADD COLUMN ${name} TEXT`); };
+addRoomCol("dm_password");
+addRoomCol("player_password");
+addRoomCol("init_state");
+addRoomCol("fog_state");
+if (!roomCols.includes("last_active")) db.exec("ALTER TABLE rooms ADD COLUMN last_active INTEGER");
+if (!roomCols.includes("map_rotation")) db.exec("ALTER TABLE rooms ADD COLUMN map_rotation INTEGER DEFAULT 0");
 const tokenCols = db.prepare("PRAGMA table_info(tokens)").all().map((c) => c.name);
 if (!tokenCols.includes("img")) {
   db.exec("ALTER TABLE tokens ADD COLUMN img TEXT");
@@ -62,7 +66,11 @@ const _ensureRoom = db.prepare(
   "INSERT OR IGNORE INTO rooms (id, created_at) VALUES (?, ?)"
 );
 const _setMap = db.prepare("UPDATE rooms SET map_url = ? WHERE id = ?");
+const _setRotation = db.prepare("UPDATE rooms SET map_rotation = ? WHERE id = ?");
 const _setDm = db.prepare("UPDATE rooms SET dm_password = ? WHERE id = ?");
+const _setPlayerPw = db.prepare("UPDATE rooms SET player_password = ? WHERE id = ?");
+const _setInit = db.prepare("UPDATE rooms SET init_state = ? WHERE id = ?");
+const _setFog = db.prepare("UPDATE rooms SET fog_state = ? WHERE id = ?");
 const _getRoom = db.prepare("SELECT * FROM rooms WHERE id = ?");
 
 export function ensureRoom(roomId) {
@@ -72,9 +80,61 @@ export function ensureRoom(roomId) {
 export function setMap(roomId, url) {
   _setMap.run(url, roomId);
 }
+export function setMapRotation(roomId, deg) {
+  _setRotation.run(deg, roomId);
+}
+export function getRoom(roomId) {
+  return _getRoom.get(roomId);
+}
 export function setDmPassword(roomId, pw) {
   _setDm.run(pw, roomId);
 }
+export function setPlayerPassword(roomId, pw) {
+  _setPlayerPw.run(pw, roomId);
+}
+export function setInitState(roomId, json) {
+  _setInit.run(json, roomId);
+}
+export function getInitState(roomId) {
+  return _getRoom.get(roomId)?.init_state || null;
+}
+export function setFogState(roomId, json) {
+  _setFog.run(json, roomId);
+}
+export function getFogState(roomId) {
+  return _getRoom.get(roomId)?.fog_state || null;
+}
+
+// --- Admin / room management ----------------------------------------------
+const _touch = db.prepare("UPDATE rooms SET last_active = ? WHERE id = ?");
+const _listRooms = db.prepare("SELECT id, created_at, last_active FROM rooms ORDER BY last_active DESC, created_at DESC");
+const _delRoom = db.prepare("DELETE FROM rooms WHERE id = ?");
+const _delRoomTokens = db.prepare("DELETE FROM tokens WHERE room_id = ?");
+const _delRoomChars = db.prepare("DELETE FROM characters WHERE room_id = ?");
+const _delRoomCreatures = db.prepare("DELETE FROM creatures WHERE room_id = ?");
+const _delRoomMaps = db.prepare("DELETE FROM maps WHERE room_id = ?");
+const _countChars = db.prepare("SELECT COUNT(*) n FROM characters WHERE room_id = ?");
+const _countCreatures = db.prepare("SELECT COUNT(*) n FROM creatures WHERE room_id = ?");
+
+export function touchRoom(roomId) {
+  _touch.run(Date.now(), roomId);
+}
+export function listRooms() {
+  return _listRooms.all().map((r) => ({
+    id: r.id,
+    created_at: r.created_at,
+    last_active: r.last_active,
+    characters: _countChars.get(r.id).n,
+    creatures: _countCreatures.get(r.id).n,
+  }));
+}
+export const deleteRoom = db.transaction((roomId) => {
+  _delRoomTokens.run(roomId);
+  _delRoomChars.run(roomId);
+  _delRoomCreatures.run(roomId);
+  _delRoomMaps.run(roomId);
+  _delRoom.run(roomId);
+});
 
 // --- Tokens ----------------------------------------------------------------
 const _getTokens = db.prepare("SELECT * FROM tokens WHERE room_id = ?");

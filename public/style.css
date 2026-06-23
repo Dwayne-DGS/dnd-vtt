@@ -76,6 +76,20 @@ body.is-player .dm-only { display: none !important; }
 body.is-player .player-note { display: block; }
 
 .join-hint { color: var(--muted); font-size: 12px; text-align: left; margin: 8px 0 0; }
+.mode-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.mode-tab { flex: 1; background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); }
+.mode-tab.active { background: var(--accent); color: #fff; }
+.link-btn { background: transparent; color: var(--muted); border: none; font-size: 12px; text-decoration: underline; margin-top: 14px; padding: 4px; }
+.link-btn:hover { color: var(--ink); }
+
+.admin-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.admin-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 460px; max-height: 80vh; overflow-y: auto; }
+.admin-card h2 { margin-top: 0; }
+.admin-list { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+.admin-room { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+.admin-room .ar-name { flex: 1; font-weight: 600; }
+.admin-room .ar-meta { font-size: 11px; color: var(--muted); }
+.admin-room button { background: #7d2e2e; padding: 4px 10px; font-size: 12px; }
 .map-controls { margin-left: auto; display: flex; gap: 8px; }
 .map-controls input { width: 220px; }
 

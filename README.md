@@ -25,10 +25,14 @@ the same **room** shares one game in real time:
 - **Text chat** — in-session messaging.
 - **Voice & video** — built-in WebRTC voice/video chat (Join voice → mute/camera
   toggles → video tiles over the map). **Requires HTTPS** — see `HTTPS-SETUP.md`.
-- **DM controls** — enter a DM password when joining to run the game. The DM
-  controls maps, tokens, the bestiary, and initiative; players can roll, chat,
-  use voice, move tokens, and edit only their own character sheet. Enforced
-  server-side, not just hidden in the UI.
+- **Rooms, DM & player passwords** — the DM creates a named table and sets a DM
+  password (secret) plus an optional player password (shared with players).
+  Matching the DM password makes you DM; the player password lets people in to
+  play. Everything is saved per room — characters, bestiary, maps, tokens, **and**
+  initiative & fog — so you can close up and continue the campaign later.
+- **DM controls** — the DM controls maps, tokens, the bestiary, and initiative;
+  players can roll, chat, use voice, move tokens, and edit only their own
+  character sheet. Enforced server-side, not just hidden in the UI.
 
 No accounts, no build step. One Node process, one SQLite file.
 
@@ -140,6 +144,24 @@ dnd-vtt/
 ```
 
 State lives in `vtt.db` (created automatically). Back it up to keep campaigns.
+
+---
+
+## Roadmap / next phases
+
+## Owner room management
+
+Set an owner password once on the server to manage rooms:
+
+```bash
+echo "your-owner-password" > /opt/dnd-vtt/admin.key
+pm2 restart dnd-vtt
+```
+
+Then on the landing screen click **"Manage rooms (owner)"**, enter that password,
+and you'll get a list of every room (with created/last-active dates and content
+counts) and a Delete button to clean up old tables. The `admin.key` file is kept
+out of git. If it's absent, room management is simply disabled.
 
 ---
 

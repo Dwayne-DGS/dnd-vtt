@@ -7,7 +7,7 @@ import { Server } from "socket.io";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { randomUUID } from "crypto";
-import { createWriteStream, mkdirSync } from "fs";
+import { createWriteStream, mkdirSync, readFileSync, existsSync } from "fs";
 import { rollDice } from "./dice.js";
 import * as store from "./db.js";
 
@@ -17,6 +17,17 @@ const PORT = process.env.PORT || 3000;
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
+
+// Owner/admin password for room management. Read from an `admin.key` file in the
+// app directory (kept out of git). If the file is absent, admin features are off.
+const ADMIN_KEY_FILE = join(__dirname, "admin.key");
+function adminPassword() {
+  try {
+    if (!existsSync(ADMIN_KEY_FILE)) return null;
+    const pw = readFileSync(ADMIN_KEY_FILE, "utf8").trim();
+    return pw || null;
+  } catch { return null; }
+}
 
 app.use(express.static(join(__dirname, "public")));
 app.get("/health", (_req, res) => res.json({ ok: true }));
@@ -58,9 +69,14 @@ const dmFlags = new Map(); // socket.id -> boolean (is this socket the DM?)
 // Initiative is live combat state — kept in memory per room and broadcast.
 const initiatives = new Map(); // roomId -> { round, turn, started, entries:[] }
 function getInit(roomId) {
-  if (!initiatives.has(roomId))
-    initiatives.set(roomId, { round: 1, turn: 0, started: false, entries: [] });
+  if (!initiatives.has(roomId)) {
+    const raw = store.getInitState(roomId);
+    initiatives.set(roomId, raw ? JSON.parse(raw) : { round: 1, turn: 0, started: false, entries: [] });
+  }
   return initiatives.get(roomId);
+}
+function persistInit(roomId) {
+  store.setInitState(roomId, JSON.stringify(getInit(roomId)));
 }
 // Who is currently in the voice call, per room.
 const voiceRooms = new Map(); // roomId -> Set<socketId>
@@ -69,12 +85,23 @@ const voiceRooms = new Map(); // roomId -> Set<socketId>
 // grid over the map. enabled=false means the whole map is visible.
 const fogRooms = new Map(); // roomId -> { enabled, revealed:Set }
 function getFog(roomId) {
-  if (!fogRooms.has(roomId)) fogRooms.set(roomId, { enabled: false, revealed: new Set() });
+  if (!fogRooms.has(roomId)) {
+    const raw = store.getFogState(roomId);
+    if (raw) {
+      const o = JSON.parse(raw);
+      fogRooms.set(roomId, { enabled: !!o.enabled, revealed: new Set(o.revealed || []) });
+    } else {
+      fogRooms.set(roomId, { enabled: false, revealed: new Set() });
+    }
+  }
   return fogRooms.get(roomId);
 }
 function fogPayload(roomId) {
   const f = getFog(roomId);
   return { enabled: f.enabled, revealed: [...f.revealed] };
+}
+function persistFog(roomId) {
+  store.setFogState(roomId, JSON.stringify(fogPayload(roomId)));
 }
 
 function sortInit(state) {
@@ -95,29 +122,11 @@ io.on("connection", (socket) => {
   let roomId = null;
   const amDM = () => dmFlags.get(socket.id) === true;
 
-  socket.on("join", ({ room, name, dmPassword }) => {
-    roomId = (room || "lobby").trim().toLowerCase();
-    const pname = (name || "Player").trim();
-    names.set(socket.id, pname);
-    socket.join(roomId);
-    const roomRow = store.ensureRoom(roomId);
-
-    // Determine role. A blank password = player. The first person to supply a
-    // password claims the room as DM and sets it; later DMs must match it.
-    let isDM = false, dmDenied = false;
-    const pw = (dmPassword || "").trim();
-    if (pw) {
-      if (!roomRow.dm_password) { store.setDmPassword(roomId, pw); isDM = true; }
-      else if (roomRow.dm_password === pw) { isDM = true; }
-      else { dmDenied = true; }
-    }
-    dmFlags.set(socket.id, isDM);
-    socket.emit("role", { isDM, name: pname, dmDenied });
-
-    // Send the current room state to the new joiner.
+  function sendState() {
     socket.emit("state", {
       room: roomId,
-      mapUrl: store.ensureRoom(roomId).map_url,
+      mapUrl: store.getRoom(roomId)?.map_url,
+      mapRotation: store.getRoom(roomId)?.map_rotation || 0,
       tokens: store.getTokens(roomId),
       characters: store.getCharacters(roomId),
       creatures: store.getCreatures(roomId),
@@ -125,35 +134,120 @@ io.on("connection", (socket) => {
       initiative: getInit(roomId),
       fog: fogPayload(roomId),
     });
+  }
+
+  // Create a brand-new table: the DM names it and sets both passwords. The
+  // creator becomes the DM. Fails if the room name is already taken.
+  socket.on("createRoom", ({ room, name, dmPassword, playerPassword }) => {
+    roomId = (room || "").trim().toLowerCase();
+    const pname = (name || "DM").trim();
+    const dpw = (dmPassword || "").trim();
+    if (!roomId) return socket.emit("joinError", "Please enter a room name.");
+    if (!dpw) return socket.emit("joinError", "A DM password is required to create a room.");
+    const existing = store.getRoom(roomId);
+    if (existing && existing.dm_password) {
+      return socket.emit("joinError", "That room name is already taken — use Join instead.");
+    }
+    store.ensureRoom(roomId);
+    store.setDmPassword(roomId, dpw);
+    store.setPlayerPassword(roomId, (playerPassword || "").trim() || null);
+    store.touchRoom(roomId);
+    names.set(socket.id, pname);
+    dmFlags.set(socket.id, true);
+    socket.join(roomId);
+    socket.emit("role", { isDM: true, name: pname, room: roomId });
+    sendState();
+    io.to(roomId).emit("chat", sys(`${pname} created the table (DM)`));
+  });
+
+  // Join an existing table. The password decides the role: matching the DM
+  // password makes you DM; matching the player password (or any password if the
+  // room has none) joins you as a player.
+  socket.on("join", ({ room, name, password }) => {
+    roomId = (room || "").trim().toLowerCase();
+    const pname = (name || "Player").trim();
+    if (!roomId) return socket.emit("joinError", "Please enter a room name.");
+    const roomRow = store.getRoom(roomId);
+    if (!roomRow) {
+      return socket.emit("joinError", "No table with that name. Ask your DM for it, or create one.");
+    }
+    const pw = (password || "").trim();
+    const dpw = roomRow.dm_password || "";
+    const ppw = roomRow.player_password || "";
+    let isDM = false;
+    if (dpw && pw === dpw) {
+      isDM = true;
+    } else if (ppw && pw !== ppw) {
+      return socket.emit("joinError", "Wrong password for this table.");
+    }
+    names.set(socket.id, pname);
+    dmFlags.set(socket.id, isDM);
+    socket.join(roomId);
+    store.touchRoom(roomId);
+    socket.emit("role", { isDM, name: pname, room: roomId });
+    sendState();
     io.to(roomId).emit("chat", sys(`${pname} joined${isDM ? " (DM)" : ""}`));
+  });
+
+  // --- Owner room management (admin.key password) --------------------------
+  function checkAdmin(pw) {
+    const real = adminPassword();
+    return real && pw === real;
+  }
+  socket.on("adminList", (password) => {
+    if (!adminPassword()) return socket.emit("adminError", "Admin isn't set up on this server yet.");
+    if (!checkAdmin(password)) return socket.emit("adminError", "Wrong admin password.");
+    socket.emit("adminRooms", store.listRooms());
+  });
+  socket.on("adminDelete", ({ password, room }) => {
+    if (!checkAdmin(password)) return socket.emit("adminError", "Wrong admin password.");
+    store.deleteRoom(room);
+    // Drop any in-memory state for the deleted room and notify anyone still in it.
+    initiatives.delete(room);
+    fogRooms.delete(room);
+    voiceRooms.delete(room);
+    io.to(room).emit("chat", sys("This room was deleted by the owner."));
+    socket.emit("adminRooms", store.listRooms());
   });
 
   // --- Map (DM only) -------------------------------------------------------
   socket.on("setMap", (url) => {
     if (!roomId || !amDM()) return;
     store.setMap(roomId, url);
+    store.setMapRotation(roomId, 0); // new map starts unrotated
     io.to(roomId).emit("mapUrl", url);
+    io.to(roomId).emit("mapRotation", 0);
     // A new map starts fully hidden again if fog was on.
     const f = getFog(roomId);
     f.revealed.clear();
+    persistFog(roomId);
     io.to(roomId).emit("fogState", fogPayload(roomId));
+  });
+  socket.on("setMapRotation", (deg) => {
+    if (!roomId || !amDM()) return;
+    const d = ((Number(deg) % 360) + 360) % 360; // normalize to 0/90/180/270
+    store.setMapRotation(roomId, d);
+    io.to(roomId).emit("mapRotation", d);
   });
 
   // --- Fog of war (DM only) ------------------------------------------------
   socket.on("fogSet", (enabled) => {
     if (!roomId || !amDM()) return;
     getFog(roomId).enabled = !!enabled;
+    persistFog(roomId);
     io.to(roomId).emit("fogState", fogPayload(roomId));
   });
   socket.on("fogReveal", (cells) => {
     if (!roomId || !amDM() || !Array.isArray(cells)) return;
     const f = getFog(roomId);
     cells.forEach((c) => f.revealed.add(c));
+    persistFog(roomId);
     io.to(roomId).emit("fogState", fogPayload(roomId));
   });
   socket.on("fogReset", () => {
     if (!roomId || !amDM()) return;
     getFog(roomId).revealed.clear();
+    persistFog(roomId);
     io.to(roomId).emit("fogState", fogPayload(roomId));
   });
 
@@ -265,6 +359,7 @@ io.on("connection", (socket) => {
 
   // --- Initiative tracker --------------------------------------------------
   function pushInit() {
+    persistInit(roomId);
     io.to(roomId).emit("initState", getInit(roomId));
   }
   socket.on("initAdd", ({ name, init, hp, ac }) => {

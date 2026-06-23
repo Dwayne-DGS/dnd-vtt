@@ -9,6 +9,9 @@ vtt.db-wal
 # Uploaded images live on the server, not in git
 public/uploads/
 
+# Owner admin password — set on the server only, never committed
+admin.key
+
 # The big self-contained installer is only needed for the no-GitHub method
 install-on-server.sh
 

@@ -11,12 +11,41 @@
   <div id="join-screen" class="join-screen">
     <div class="join-card">
       <h1>⚔️ D&D Virtual Tabletop</h1>
-      <p>Enter a room name to start or join a game.</p>
-      <label>Your name <input id="join-name" placeholder="e.g. Dwayne" /></label>
-      <label>Room <input id="join-room" placeholder="e.g. curse-of-strahd" /></label>
-      <label>DM password <input id="join-dm" type="password" placeholder="blank = join as a player" /></label>
-      <p class="join-hint">Running the game? Enter a DM password to control maps, monsters &amp; initiative. The first person to use a password sets it for the room.</p>
-      <button id="join-btn">Enter table</button>
+      <div class="mode-tabs">
+        <button id="mode-join" class="mode-tab active">Join a table</button>
+        <button id="mode-create" class="mode-tab">Create a table</button>
+      </div>
+
+      <!-- JOIN -->
+      <div id="join-form">
+        <label>Your name <input id="join-name" placeholder="e.g. Dwayne" /></label>
+        <label>Room <input id="join-room" placeholder="e.g. curse-of-strahd" /></label>
+        <label>Password <input id="join-pw" type="password" placeholder="the table's password" /></label>
+        <p class="join-hint">Enter the DM password to run the game, or the player password to play. Ask your DM for the table name &amp; password.</p>
+        <button id="join-btn">Enter table</button>
+      </div>
+
+      <!-- CREATE -->
+      <div id="create-form" class="hidden">
+        <label>Your name <input id="create-name" placeholder="e.g. Dwayne" /></label>
+        <label>Room name <input id="create-room" placeholder="e.g. curse-of-strahd" /></label>
+        <label>DM password <input id="create-dm" type="password" placeholder="kept secret — makes you the DM" /></label>
+        <label>Player password <input id="create-player" type="password" placeholder="optional — share with your players" /></label>
+        <p class="join-hint">You'll be the DM. Players join with the table name and the player password. Leave player password blank to let anyone with the name join.</p>
+        <button id="create-btn">Create table</button>
+      </div>
+
+      <button id="admin-link" class="link-btn">Manage rooms (owner)</button>
+    </div>
+  </div>
+
+  <!-- Owner room-management overlay -->
+  <div id="admin-overlay" class="admin-overlay hidden">
+    <div class="admin-card">
+      <h2>Room management</h2>
+      <p class="join-hint">Delete old or unused tables. This permanently removes their characters, monsters, maps, and tokens.</p>
+      <div id="admin-list" class="admin-list"></div>
+      <button id="admin-close" class="btn-secondary">Close</button>
     </div>
   </div>
 
@@ -34,6 +63,7 @@
         <button id="map-set" class="dm-only">Set map</button>
         <button id="map-save" class="btn-secondary dm-only" title="Save this map URL to the library">★</button>
         <button id="map-upload" class="btn-secondary dm-only" title="Upload a map image from your computer">⬆ Map</button>
+        <button id="map-rotate" class="btn-secondary dm-only" title="Rotate the map 90°">⟳</button>
         <button id="add-token" class="dm-only">+ Token</button>
         <button id="add-portrait" class="dm-only" title="Add a token with a portrait image">+ 📷</button>
         <button id="snap-toggle" class="btn-secondary" title="Snap tokens to the grid when you drop them">▦ Snap</button>

@@ -20,31 +20,101 @@ const app = document.getElementById("app");
 // so we never miss the event.
 window.isDM = false;
 window.playerName = "Player";
-socket.on("role", ({ isDM, name, dmDenied }) => {
+let entered = false;
+
+function setRole(isDM, name) {
   window.isDM = !!isDM;
   window.playerName = name;
   document.body.classList.toggle("is-player", !isDM);
   const badge = document.getElementById("role-badge");
   badge.textContent = isDM ? "DM" : "Player";
   badge.className = "role-badge " + (isDM ? "dm" : "player");
-  if (dmDenied) {
-    alert("That DM password didn't match this room — you've joined as a player.");
-  }
+}
+
+// Server confirms the join/create with a role; only then do we enter the app.
+socket.on("role", ({ isDM, name, room }) => {
+  setRole(isDM, name);
+  if (!entered) { entered = true; enterApp(room); }
+});
+socket.on("joinError", (msg) => alert(msg || "Could not join that table."));
+
+// Landing screen: toggle between Join and Create.
+const joinForm = document.getElementById("join-form");
+const createForm = document.getElementById("create-form");
+const modeJoin = document.getElementById("mode-join");
+const modeCreate = document.getElementById("mode-create");
+modeJoin.addEventListener("click", () => {
+  modeJoin.classList.add("active"); modeCreate.classList.remove("active");
+  joinForm.classList.remove("hidden"); createForm.classList.add("hidden");
+});
+modeCreate.addEventListener("click", () => {
+  modeCreate.classList.add("active"); modeJoin.classList.remove("active");
+  createForm.classList.remove("hidden"); joinForm.classList.add("hidden");
 });
 
-document.getElementById("join-btn").addEventListener("click", join);
-document.getElementById("join-room").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") join();
-});
-
-function join() {
+function doJoin() {
   const name = document.getElementById("join-name").value.trim() || "Player";
-  const room = document.getElementById("join-room").value.trim() || "lobby";
-  const dmPassword = document.getElementById("join-dm").value;
-
+  const room = document.getElementById("join-room").value.trim();
+  const password = document.getElementById("join-pw").value;
+  if (!room) { alert("Enter the table (room) name."); return; }
   socket.connect();
-  socket.emit("join", { name, room, dmPassword });
+  socket.emit("join", { name, room, password });
+}
+function doCreate() {
+  const name = document.getElementById("create-name").value.trim() || "DM";
+  const room = document.getElementById("create-room").value.trim();
+  const dmPassword = document.getElementById("create-dm").value;
+  const playerPassword = document.getElementById("create-player").value;
+  if (!room) { alert("Enter a room name."); return; }
+  if (!dmPassword) { alert("Set a DM password to create a table."); return; }
+  socket.connect();
+  socket.emit("createRoom", { name, room, dmPassword, playerPassword });
+}
+document.getElementById("join-btn").addEventListener("click", doJoin);
+document.getElementById("join-pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doJoin(); });
+document.getElementById("create-btn").addEventListener("click", doCreate);
 
+// --- Owner room management ----------------------------------------------
+let adminPw = null;
+const adminOverlay = document.getElementById("admin-overlay");
+const adminListEl = document.getElementById("admin-list");
+
+document.getElementById("admin-link").addEventListener("click", () => {
+  const pw = prompt("Owner/admin password:");
+  if (!pw) return;
+  adminPw = pw;
+  socket.connect();
+  socket.emit("adminList", pw);
+});
+document.getElementById("admin-close").addEventListener("click", () => adminOverlay.classList.add("hidden"));
+socket.on("adminError", (msg) => alert(msg || "Admin error."));
+socket.on("adminRooms", (rooms) => {
+  adminListEl.innerHTML = "";
+  if (!rooms.length) adminListEl.innerHTML = "<p class='join-hint'>No rooms yet.</p>";
+  const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString() : "—";
+  for (const r of rooms) {
+    const row = document.createElement("div");
+    row.className = "admin-room";
+    row.innerHTML = `
+      <div style="flex:1">
+        <div class="ar-name">${escapeHtml(r.id)}</div>
+        <div class="ar-meta">created ${fmtDate(r.created_at)} · last active ${fmtDate(r.last_active)} · ${r.characters} PCs, ${r.creatures} creatures</div>
+      </div>
+      <button>Delete</button>`;
+    row.querySelector("button").addEventListener("click", () => {
+      if (confirm(`Permanently delete room "${r.id}" and all its data?`)) {
+        socket.emit("adminDelete", { password: adminPw, room: r.id });
+      }
+    });
+    adminListEl.appendChild(row);
+  }
+  adminOverlay.classList.remove("hidden");
+});
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function enterApp(room) {
   document.getElementById("room-label").textContent = `Room: ${room}`;
   joinScreen.classList.add("hidden");
   app.classList.remove("hidden");

@@ -85,6 +85,14 @@ rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 ```
 
+**Important — allow large uploads.** Nginx caps request bodies at 1 MB by default,
+which makes map/portrait image uploads fail. Raise it once:
+
+```bash
+echo 'client_max_body_size 15M;' > /etc/nginx/conf.d/upload-size.conf
+nginx -t && systemctl reload nginx
+```
+
 (The `Upgrade`/`Connection` headers are what let the live sync and voice signaling
 work through Nginx — without them, real-time features break.)
 
