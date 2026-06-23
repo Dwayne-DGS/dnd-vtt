@@ -1,0 +1,13 @@
+# Dependencies — reinstalled on the server, never committed
+node_modules/
+
+# Local database files (your live game data lives on the server)
+vtt.db
+vtt.db-shm
+vtt.db-wal
+
+# The big self-contained installer is only needed for the no-GitHub method
+install-on-server.sh
+
+# OS noise
+.DS_Store

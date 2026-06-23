@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>D&D Virtual Tabletop</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <!-- Join screen -->
+  <div id="join-screen" class="join-screen">
+    <div class="join-card">
+      <h1>⚔️ D&D Virtual Tabletop</h1>
+      <p>Enter a room name to start or join a game.</p>
+      <label>Your name <input id="join-name" placeholder="e.g. Dwayne" /></label>
+      <label>Room <input id="join-room" placeholder="e.g. curse-of-strahd" /></label>
+      <button id="join-btn">Enter table</button>
+    </div>
+  </div>
+
+  <!-- Main app -->
+  <div id="app" class="app hidden">
+    <header class="topbar">
+      <span class="brand">⚔️ VTT</span>
+      <span id="room-label" class="room-label"></span>
+      <div class="map-controls">
+        <select id="map-picker" title="Saved maps">
+          <option value="">— saved maps —</option>
+        </select>
+        <input id="map-url" placeholder="Paste a map image URL…" />
+        <button id="map-set">Set map</button>
+        <button id="map-save" class="btn-secondary" title="Save this map URL to the library">★</button>
+        <button id="add-token">+ Token</button>
+        <span class="voice-controls">
+          <button id="voice-join" title="Start voice/video chat">🎤 Join voice</button>
+          <button id="voice-mute" class="btn-secondary hidden">🔇 Mute</button>
+          <button id="voice-cam" class="btn-secondary hidden">📷 Cam off</button>
+          <button id="voice-leave" class="hidden">Leave</button>
+        </span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="map-wrap">
+        <canvas id="map-canvas"></canvas>
+        <div id="video-strip" class="video-strip hidden"></div>
+        <p class="hint">Drag tokens to move them. Double-click a token to remove it.</p>
+      </section>
+
+      <aside class="sidebar">
+        <nav class="tabs">
+          <button class="tab active" data-tab="chat">Chat</button>
+          <button class="tab" data-tab="sheets">PCs</button>
+          <button class="tab" data-tab="init">Initiative</button>
+          <button class="tab" data-tab="bestiary">Bestiary</button>
+          <button class="tab" data-tab="refs">Refs</button>
+        </nav>
+
+        <!-- Chat + dice -->
+        <div id="tab-chat" class="tab-panel active">
+          <div id="chat-log" class="chat-log"></div>
+          <div class="dice-bar">
+            <button data-die="d20">d20</button>
+            <button data-die="d12">d12</button>
+            <button data-die="d10">d10</button>
+            <button data-die="d8">d8</button>
+            <button data-die="d6">d6</button>
+            <button data-die="d4">d4</button>
+          </div>
+          <div class="chat-input">
+            <input id="chat-text" placeholder="Message, or roll like 2d6+3…" />
+            <button id="chat-send">Send</button>
+          </div>
+        </div>
+
+        <!-- Character sheets -->
+        <div id="tab-sheets" class="tab-panel">
+          <button id="new-char">+ New character</button>
+          <div id="char-list" class="char-list"></div>
+        </div>
+
+        <!-- Initiative tracker -->
+        <div id="tab-init" class="tab-panel">
+          <div class="init-header">
+            <span id="init-round" class="init-round">Round 1</span>
+            <div>
+              <button id="init-next">Next turn ▶</button>
+              <button id="init-clear" class="btn-secondary">Clear</button>
+            </div>
+          </div>
+          <div class="init-add">
+            <input id="init-name" placeholder="Name" />
+            <input id="init-roll" placeholder="Init" type="number" class="narrow" />
+            <input id="init-hp" placeholder="HP" class="narrow" />
+            <button id="init-add-btn">Add</button>
+          </div>
+          <div id="init-list" class="init-list"></div>
+        </div>
+
+        <!-- Bestiary (monsters + NPCs) -->
+        <div id="tab-bestiary" class="tab-panel">
+          <div class="bestiary-top">
+            <select id="creature-template">
+              <option value="">— SRD template —</option>
+            </select>
+            <button id="new-creature">+ New</button>
+          </div>
+          <div id="creature-list" class="char-list"></div>
+        </div>
+
+        <!-- Reference links -->
+        <div id="tab-refs" class="tab-panel">
+          <p class="ref-intro">Look up a spell or magic item — opens the D&amp;D 5e wiki in a new tab.</p>
+          <div class="ref-search">
+            <input id="ref-query" placeholder="e.g. Fireball, Bag of Holding…" />
+            <button id="ref-spell">Spell</button>
+            <button id="ref-item">Item</button>
+          </div>
+          <div class="ref-links">
+            <h4>Quick links</h4>
+            <a href="http://dnd5e.wikidot.com/spells" target="_blank" rel="noopener">All spells (by level)</a>
+            <a href="http://dnd5e.wikidot.com/wondrous-items" target="_blank" rel="noopener">Wondrous items</a>
+            <a href="http://dnd5e.wikidot.com/weapons" target="_blank" rel="noopener">Magic weapons</a>
+            <a href="http://dnd5e.wikidot.com/armor" target="_blank" rel="noopener">Magic armor</a>
+            <a href="http://dnd5e.wikidot.com/potions" target="_blank" rel="noopener">Potions</a>
+            <a href="http://dnd5e.wikidot.com/conditions" target="_blank" rel="noopener">Conditions</a>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
