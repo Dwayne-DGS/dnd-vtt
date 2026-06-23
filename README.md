@@ -4,13 +4,17 @@ A lightweight, self-hosted live virtual tabletop for D&D 5e. Everyone who joins
 the same **room** shares one game in real time:
 
 - **Shared map + tokens** — set a battle-map image (paste a URL **or upload a file**),
-  add tokens (colored discs or **uploaded portrait images**), drag them around.
-  Moves appear instantly for every player. **Map library:** save multiple named
-  maps and switch with one click.
+  add tokens (colored discs or **uploaded portrait images**), drag them around with
+  optional **grid snapping**. Moves appear instantly for every player. **Map
+  library:** save multiple named maps and switch with one click.
+- **Fog of war** — the DM toggles fog on, then paints to reveal areas as the party
+  explores. Players see hidden areas blacked out; the DM sees them dimmed.
+- **Bestiary → map** — place any saved creature onto the map as a token in one click.
 - **Dice roller** — quick buttons (d20, d12, …) plus full notation like `2d6+3`
   or `3d10+2d4+1`. Rolls are broadcast to the whole table.
-- **Character sheets** — D&D 5e sheets (abilities, AC, HP, level) saved per room,
-  with auto-computed ability modifiers and a one-click "roll a check" button.
+- **Character sheets** — full D&D 5e sheets saved per room: abilities, AC, HP
+  (current/max), proficiency, saving throws, all 18 skills, spell slots, and
+  inventory — with auto-computed modifiers and roll buttons on every save and skill.
 - **Bestiary** — build and save monsters *and* NPCs with full stat blocks (AC, HP,
   speed, abilities, actions/notes). Comes with SRD templates (goblin, orc,
   skeleton, wolf, bandit, generic NPC). One click rolls a creature into initiative.

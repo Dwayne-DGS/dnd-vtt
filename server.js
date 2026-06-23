@@ -65,6 +65,18 @@ function getInit(roomId) {
 // Who is currently in the voice call, per room.
 const voiceRooms = new Map(); // roomId -> Set<socketId>
 
+// Fog of war per room. revealed = Set of "col,row" cell keys in a normalized
+// grid over the map. enabled=false means the whole map is visible.
+const fogRooms = new Map(); // roomId -> { enabled, revealed:Set }
+function getFog(roomId) {
+  if (!fogRooms.has(roomId)) fogRooms.set(roomId, { enabled: false, revealed: new Set() });
+  return fogRooms.get(roomId);
+}
+function fogPayload(roomId) {
+  const f = getFog(roomId);
+  return { enabled: f.enabled, revealed: [...f.revealed] };
+}
+
 function sortInit(state) {
   // Highest initiative first. Before combat starts (no "Next turn" pressed yet),
   // the top of the order is "up first". Once combat is underway, keep the
@@ -111,6 +123,7 @@ io.on("connection", (socket) => {
       creatures: store.getCreatures(roomId),
       maps: store.getMaps(roomId),
       initiative: getInit(roomId),
+      fog: fogPayload(roomId),
     });
     io.to(roomId).emit("chat", sys(`${pname} joined${isDM ? " (DM)" : ""}`));
   });
@@ -120,6 +133,28 @@ io.on("connection", (socket) => {
     if (!roomId || !amDM()) return;
     store.setMap(roomId, url);
     io.to(roomId).emit("mapUrl", url);
+    // A new map starts fully hidden again if fog was on.
+    const f = getFog(roomId);
+    f.revealed.clear();
+    io.to(roomId).emit("fogState", fogPayload(roomId));
+  });
+
+  // --- Fog of war (DM only) ------------------------------------------------
+  socket.on("fogSet", (enabled) => {
+    if (!roomId || !amDM()) return;
+    getFog(roomId).enabled = !!enabled;
+    io.to(roomId).emit("fogState", fogPayload(roomId));
+  });
+  socket.on("fogReveal", (cells) => {
+    if (!roomId || !amDM() || !Array.isArray(cells)) return;
+    const f = getFog(roomId);
+    cells.forEach((c) => f.revealed.add(c));
+    io.to(roomId).emit("fogState", fogPayload(roomId));
+  });
+  socket.on("fogReset", () => {
+    if (!roomId || !amDM()) return;
+    getFog(roomId).revealed.clear();
+    io.to(roomId).emit("fogState", fogPayload(roomId));
   });
 
   // --- Tokens --------------------------------------------------------------

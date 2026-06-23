@@ -89,6 +89,7 @@ export function initBestiary(socket) {
       <div class="char-actions">
         <button data-act="save">Save</button>
         <button class="btn-secondary" data-act="init">→ Initiative</button>
+        <button class="btn-secondary" data-act="map">→ Map</button>
         <button class="btn-secondary" data-act="del">Delete</button>
       </div>`;
 
@@ -119,6 +120,13 @@ export function initBestiary(socket) {
       const dexMod = Math.floor((Number(d.abilities.DEX || 10) - 10) / 2);
       const roll = 1 + Math.floor(Math.random() * 20) + dexMod;
       if (window.addToInitiative) window.addToInitiative(d.name, roll, d.hp);
+    });
+    el.querySelector('[data-act="map"]').addEventListener("click", () => {
+      const d = collect();
+      // Place as a token. Monsters get a red disc, NPCs a gold one, labeled
+      // with the first letters of the name.
+      const color = d.kind === "NPC" ? "#b8860b" : "#7d2e2e";
+      socket.emit("addToken", { label: d.name, color, img: d.img || null });
     });
 
     // Players get a read-only view of the bestiary (no editing/deleting/adding).

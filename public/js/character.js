@@ -1,23 +1,32 @@
-// D&D 5e character sheets. Shared per room: saving syncs to everyone.
-// Ability modifiers are auto-computed. Clicking a saved sheet's roll buttons
-// sends a check to the dice/chat panel.
+// D&D 5e character sheets — shared per room. Players edit only their own;
+// the DM edits anyone's (enforced server-side). Includes abilities, saving
+// throws, all 18 skills, spell slots, and inventory, each with roll buttons.
 
 const ABILITIES = ["STR", "DEX", "CON", "INT", "WIS", "CHA"];
+const SKILLS = [
+  ["Acrobatics", "DEX"], ["Animal Handling", "WIS"], ["Arcana", "INT"],
+  ["Athletics", "STR"], ["Deception", "CHA"], ["History", "INT"],
+  ["Insight", "WIS"], ["Intimidation", "CHA"], ["Investigation", "INT"],
+  ["Medicine", "WIS"], ["Nature", "INT"], ["Perception", "WIS"],
+  ["Performance", "CHA"], ["Persuasion", "CHA"], ["Religion", "INT"],
+  ["Sleight of Hand", "DEX"], ["Stealth", "DEX"], ["Survival", "WIS"],
+];
 
 export function initCharacters(socket) {
   const list = document.getElementById("char-list");
   const newBtn = document.getElementById("new-char");
-  let characters = []; // {id, name, class, level, ac, hp, abilities:{...}}
+  let characters = [];
 
-  function mod(score) {
-    const m = Math.floor((Number(score || 10) - 10) / 2);
-    return (m >= 0 ? "+" : "") + m;
-  }
+  const abilMod = (score) => Math.floor((Number(score || 10) - 10) / 2);
+  const fmt = (m) => (m >= 0 ? "+" : "") + m;
 
   function blank() {
     return {
-      id: null, name: "New Character", cls: "", level: 1, ac: 10, hp: 10,
+      id: null, name: "New Character", cls: "", level: 1, ac: 10,
+      hp: 10, hpMax: 10, prof: 2,
       abilities: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
+      saves: {}, skills: {},
+      slots: {}, inventory: "",
     };
   }
 
@@ -27,71 +36,128 @@ export function initCharacters(socket) {
   }
 
   function card(c) {
-    // Players may edit only their own sheets; the DM (or an owner-less legacy
-    // sheet) can be edited by anyone allowed.
     const canEdit = window.isDM || !c.owner || c.owner === window.playerName;
     const el = document.createElement("div");
     el.className = "char-card";
+
+    const abilHTML = ABILITIES.map((a) => `
+      <div class="ability">
+        <label>${a} (<span data-mod="${a}">${fmt(abilMod(c.abilities[a]))}</span>)</label>
+        <input data-ability="${a}" type="number" value="${attr(c.abilities[a])}"/>
+      </div>`).join("");
+
+    const saveHTML = ABILITIES.map((a) => `
+      <div class="line">
+        <input type="checkbox" data-save="${a}" ${c.saves?.[a] ? "checked" : ""}/>
+        <span class="ln-name">${a} save</span>
+        <span class="ln-mod" data-savemod="${a}">+0</span>
+        <button class="mini" data-rollsave="${a}">🎲</button>
+      </div>`).join("");
+
+    const skillHTML = SKILLS.map(([s, ab]) => `
+      <div class="line">
+        <input type="checkbox" data-skill="${attr(s)}" ${c.skills?.[s] ? "checked" : ""}/>
+        <span class="ln-name">${s} <em>(${ab})</em></span>
+        <span class="ln-mod" data-skillmod="${attr(s)}">+0</span>
+        <button class="mini" data-rollskill="${attr(s)}" data-ab="${ab}">🎲</button>
+      </div>`).join("");
+
+    const slotHTML = [1,2,3,4,5,6,7,8,9].map((lv) => `
+      <div class="slot">
+        <label>L${lv}</label>
+        <input data-slot-used="${lv}" type="number" min="0" value="${attr(c.slots?.[lv]?.used ?? 0)}" title="used"/>
+        <span>/</span>
+        <input data-slot-total="${lv}" type="number" min="0" value="${attr(c.slots?.[lv]?.total ?? 0)}" title="total"/>
+      </div>`).join("");
+
     el.innerHTML = `
       <div class="char-row"><label>Name<input data-f="name" value="${attr(c.name)}"/></label></div>
       <div class="char-row">
         <label>Class<input data-f="cls" value="${attr(c.cls)}"/></label>
         <label>Level<input data-f="level" type="number" value="${attr(c.level)}"/></label>
+        <label>Prof<input data-f="prof" type="number" value="${attr(c.prof ?? 2)}"/></label>
       </div>
       <div class="char-row">
         <label>AC<input data-f="ac" type="number" value="${attr(c.ac)}"/></label>
         <label>HP<input data-f="hp" type="number" value="${attr(c.hp)}"/></label>
+        <label>Max HP<input data-f="hpMax" type="number" value="${attr(c.hpMax ?? c.hp)}"/></label>
       </div>
-      <div class="abilities">
-        ${ABILITIES.map((a) => `
-          <div class="ability">
-            <label>${a} (<span data-mod="${a}">${mod(c.abilities[a])}</span>)</label>
-            <input data-ability="${a}" type="number" value="${attr(c.abilities[a])}"/>
-          </div>`).join("")}
-      </div>
+      <div class="abilities">${abilHTML}</div>
+      <details><summary>Saving throws</summary><div class="lines">${saveHTML}</div></details>
+      <details><summary>Skills</summary><div class="lines">${skillHTML}</div></details>
+      <details><summary>Spell slots</summary><div class="slots">${slotHTML}</div></details>
+      <details><summary>Inventory &amp; notes</summary>
+        <textarea data-f="inventory" rows="4">${esc(c.inventory || "")}</textarea>
+      </details>
       <div class="char-actions">
         <button data-act="save">Save</button>
-        <button class="btn-secondary" data-act="roll">Roll check</button>
         <button class="btn-secondary" data-act="del">Delete</button>
       </div>`;
 
-    // Live-update modifier display as ability scores change.
-    el.querySelectorAll("[data-ability]").forEach((inp) => {
-      inp.addEventListener("input", () => {
-        el.querySelector(`[data-mod="${inp.dataset.ability}"]`).textContent =
-          mod(inp.value);
-      });
-    });
-
     function collect() {
-      const data = { ...c };
-      el.querySelectorAll("[data-f]").forEach((i) => (data[i.dataset.f] = i.value));
-      data.abilities = {};
-      el.querySelectorAll("[data-ability]").forEach(
-        (i) => (data.abilities[i.dataset.ability] = Number(i.value))
-      );
-      return data;
+      const d = { ...c };
+      el.querySelectorAll("[data-f]").forEach((i) => (d[i.dataset.f] = i.value));
+      d.abilities = {};
+      el.querySelectorAll("[data-ability]").forEach((i) => (d.abilities[i.dataset.ability] = Number(i.value)));
+      d.saves = {};
+      el.querySelectorAll("[data-save]").forEach((i) => { if (i.checked) d.saves[i.dataset.save] = true; });
+      d.skills = {};
+      el.querySelectorAll("[data-skill]").forEach((i) => { if (i.checked) d.skills[i.dataset.skill] = true; });
+      d.slots = {};
+      [1,2,3,4,5,6,7,8,9].forEach((lv) => {
+        const used = Number(el.querySelector(`[data-slot-used="${lv}"]`).value) || 0;
+        const total = Number(el.querySelector(`[data-slot-total="${lv}"]`).value) || 0;
+        if (total > 0 || used > 0) d.slots[lv] = { used, total };
+      });
+      return d;
     }
 
-    el.querySelector('[data-act="save"]').addEventListener("click", () => {
-      const data = collect();
-      socket.emit("saveCharacter", { id: c.id, data });
-    });
+    // Live-recompute all displayed modifiers from the current field values.
+    function recompute() {
+      const d = collect();
+      const prof = Number(d.prof) || 0;
+      ABILITIES.forEach((a) => {
+        el.querySelector(`[data-mod="${a}"]`).textContent = fmt(abilMod(d.abilities[a]));
+        el.querySelector(`[data-savemod="${a}"]`).textContent =
+          fmt(abilMod(d.abilities[a]) + (d.saves[a] ? prof : 0));
+      });
+      SKILLS.forEach(([s, ab]) => {
+        el.querySelector(`[data-skillmod="${CSS.escape(s)}"]`).textContent =
+          fmt(abilMod(d.abilities[ab]) + (d.skills[s] ? prof : 0));
+      });
+    }
+    el.querySelectorAll("input").forEach((i) => i.addEventListener("input", recompute));
+    el.querySelectorAll("input[type=checkbox]").forEach((i) => i.addEventListener("change", recompute));
+
+    function roll(modifier) {
+      const m = modifier === 0 ? "" : fmt(modifier);
+      socket.emit("roll", `1d20${m}`);
+    }
+    el.querySelectorAll("[data-rollsave]").forEach((b) =>
+      b.addEventListener("click", () => {
+        const d = collect(); const a = b.dataset.rollsave;
+        roll(abilMod(d.abilities[a]) + (d.saves[a] ? (Number(d.prof) || 0) : 0));
+      })
+    );
+    el.querySelectorAll("[data-rollskill]").forEach((b) =>
+      b.addEventListener("click", () => {
+        const d = collect(); const s = b.dataset.rollskill; const ab = b.dataset.ab;
+        roll(abilMod(d.abilities[ab]) + (d.skills[s] ? (Number(d.prof) || 0) : 0));
+      })
+    );
+
+    el.querySelector('[data-act="save"]').addEventListener("click", () =>
+      socket.emit("saveCharacter", { id: c.id, data: collect() })
+    );
     el.querySelector('[data-act="del"]').addEventListener("click", () => {
       if (c.id && confirm(`Delete ${c.name}?`)) socket.emit("deleteCharacter", c.id);
       else if (!c.id) { characters = characters.filter((x) => x !== c); render(); }
     });
-    el.querySelector('[data-act="roll"]').addEventListener("click", () => {
-      const a = prompt("Which ability? (STR, DEX, CON, INT, WIS, CHA)", "DEX");
-      if (!a || !ABILITIES.includes(a.toUpperCase())) return;
-      const m = mod(collect().abilities[a.toUpperCase()]);
-      socket.emit("roll", `1d20${m === "+0" ? "" : m}`);
-    });
 
-    // If this isn't the viewer's sheet (and they aren't the DM), make it
-    // read-only: lock the fields and hide Save/Delete. Rolling stays allowed.
+    recompute();
+
     if (!canEdit) {
-      el.querySelectorAll("input").forEach((i) => (i.disabled = true));
+      el.querySelectorAll("input, textarea").forEach((i) => (i.disabled = true));
       el.querySelector('[data-act="save"]').style.display = "none";
       el.querySelector('[data-act="del"]').style.display = "none";
       if (c.owner) {
@@ -111,10 +177,8 @@ export function initCharacters(socket) {
     const i = characters.findIndex((x) => x.id === c.id);
     if (i >= 0) characters[i] = c;
     else {
-      // Replace the unsaved blank if present, else append.
-      const blankIdx = characters.findIndex((x) => x.id === null);
-      if (blankIdx >= 0) characters[blankIdx] = c;
-      else characters.push(c);
+      const b = characters.findIndex((x) => x.id === null);
+      if (b >= 0) characters[b] = c; else characters.push(c);
     }
     render();
   });
@@ -124,6 +188,8 @@ export function initCharacters(socket) {
   });
 }
 
-function attr(s) {
-  return String(s ?? "").replace(/"/g, "&quot;");
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
+function attr(s) { return String(s ?? "").replace(/"/g, "&quot;"); }

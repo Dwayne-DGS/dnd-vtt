@@ -194,4 +194,21 @@ body.is-player .player-note { display: block; }
 .abilities input { width: 100%; text-align: center; }
 .char-actions { display: flex; gap: 6px; margin-top: 10px; }
 .char-actions button { flex: 1; }
+
+/* Richer sheet sections */
+.char-card details { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; }
+.char-card summary { cursor: pointer; color: var(--accent-2); font-size: 13px; font-weight: 600; }
+.char-card .lines { margin-top: 6px; }
+.char-card .line { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 2px 0; }
+.char-card .line .ln-name { flex: 1; }
+.char-card .line .ln-name em { color: var(--muted); font-style: normal; font-size: 11px; }
+.char-card .line .ln-mod { width: 30px; text-align: right; color: var(--accent-2); font-weight: 700; }
+.char-card .mini { padding: 2px 6px; background: var(--panel); border: 1px solid var(--border); font-size: 12px; }
+.char-card .mini:hover { background: var(--accent); }
+.char-card .slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; }
+.char-card .slot { display: flex; align-items: center; gap: 3px; font-size: 12px; }
+.char-card .slot label { color: var(--muted); width: 18px; }
+.char-card .slot input { width: 34px; text-align: center; padding: 3px; }
+.char-card textarea { width: 100%; background: var(--panel-2); color: var(--ink); border: 1px solid var(--border); border-radius: 6px; padding: 6px; font-family: inherit; font-size: 13px; resize: vertical; margin-top: 6px; }
 .btn-secondary { background: var(--panel); border: 1px solid var(--border); }
+button.active { background: var(--accent-2); color: #1a1410; }
