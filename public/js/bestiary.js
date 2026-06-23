@@ -120,6 +120,12 @@ export function initBestiary(socket) {
       const roll = 1 + Math.floor(Math.random() * 20) + dexMod;
       if (window.addToInitiative) window.addToInitiative(d.name, roll, d.hp);
     });
+
+    // Players get a read-only view of the bestiary (no editing/deleting/adding).
+    if (!window.isDM) {
+      el.querySelectorAll("input, textarea, select").forEach((i) => (i.disabled = true));
+      el.querySelector(".char-actions").style.display = "none";
+    }
     return el;
   }
 

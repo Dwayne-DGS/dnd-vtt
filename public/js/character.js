@@ -27,6 +27,9 @@ export function initCharacters(socket) {
   }
 
   function card(c) {
+    // Players may edit only their own sheets; the DM (or an owner-less legacy
+    // sheet) can be edited by anyone allowed.
+    const canEdit = window.isDM || !c.owner || c.owner === window.playerName;
     const el = document.createElement("div");
     el.className = "char-card";
     el.innerHTML = `
@@ -84,6 +87,20 @@ export function initCharacters(socket) {
       const m = mod(collect().abilities[a.toUpperCase()]);
       socket.emit("roll", `1d20${m === "+0" ? "" : m}`);
     });
+
+    // If this isn't the viewer's sheet (and they aren't the DM), make it
+    // read-only: lock the fields and hide Save/Delete. Rolling stays allowed.
+    if (!canEdit) {
+      el.querySelectorAll("input").forEach((i) => (i.disabled = true));
+      el.querySelector('[data-act="save"]').style.display = "none";
+      el.querySelector('[data-act="del"]').style.display = "none";
+      if (c.owner) {
+        const tag = document.createElement("div");
+        tag.style.cssText = "font-size:12px;color:var(--muted);margin-top:4px";
+        tag.textContent = "Owned by " + c.owner;
+        el.appendChild(tag);
+      }
+    }
     return el;
   }
 

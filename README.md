@@ -20,6 +20,10 @@ the same **room** shares one game in real time:
 - **Text chat** — in-session messaging.
 - **Voice & video** — built-in WebRTC voice/video chat (Join voice → mute/camera
   toggles → video tiles over the map). **Requires HTTPS** — see `HTTPS-SETUP.md`.
+- **DM controls** — enter a DM password when joining to run the game. The DM
+  controls maps, tokens, the bestiary, and initiative; players can roll, chat,
+  use voice, move tokens, and edit only their own character sheet. Enforced
+  server-side, not just hidden in the UI.
 
 No accounts, no build step. One Node process, one SQLite file.
 

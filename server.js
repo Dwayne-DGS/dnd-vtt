@@ -20,8 +20,9 @@ const io = new Server(httpServer);
 app.use(express.static(join(__dirname, "public")));
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-// Track display names in memory (cleared on restart — fine for sessions).
+// Track display names and DM status in memory (cleared on restart).
 const names = new Map(); // socket.id -> name
+const dmFlags = new Map(); // socket.id -> boolean (is this socket the DM?)
 
 // Initiative is live combat state — kept in memory per room and broadcast.
 const initiatives = new Map(); // roomId -> { round, turn, started, entries:[] }
@@ -49,12 +50,26 @@ function sortInit(state) {
 
 io.on("connection", (socket) => {
   let roomId = null;
+  const amDM = () => dmFlags.get(socket.id) === true;
 
-  socket.on("join", ({ room, name }) => {
+  socket.on("join", ({ room, name, dmPassword }) => {
     roomId = (room || "lobby").trim().toLowerCase();
-    names.set(socket.id, name || "Player");
+    const pname = (name || "Player").trim();
+    names.set(socket.id, pname);
     socket.join(roomId);
-    store.ensureRoom(roomId);
+    const roomRow = store.ensureRoom(roomId);
+
+    // Determine role. A blank password = player. The first person to supply a
+    // password claims the room as DM and sets it; later DMs must match it.
+    let isDM = false, dmDenied = false;
+    const pw = (dmPassword || "").trim();
+    if (pw) {
+      if (!roomRow.dm_password) { store.setDmPassword(roomId, pw); isDM = true; }
+      else if (roomRow.dm_password === pw) { isDM = true; }
+      else { dmDenied = true; }
+    }
+    dmFlags.set(socket.id, isDM);
+    socket.emit("role", { isDM, name: pname, dmDenied });
 
     // Send the current room state to the new joiner.
     socket.emit("state", {
@@ -66,19 +81,19 @@ io.on("connection", (socket) => {
       maps: store.getMaps(roomId),
       initiative: getInit(roomId),
     });
-    io.to(roomId).emit("chat", sys(`${names.get(socket.id)} joined`));
+    io.to(roomId).emit("chat", sys(`${pname} joined${isDM ? " (DM)" : ""}`));
   });
 
-  // --- Map -----------------------------------------------------------------
+  // --- Map (DM only) -------------------------------------------------------
   socket.on("setMap", (url) => {
-    if (!roomId) return;
+    if (!roomId || !amDM()) return;
     store.setMap(roomId, url);
     io.to(roomId).emit("mapUrl", url);
   });
 
   // --- Tokens --------------------------------------------------------------
   socket.on("addToken", ({ label, color }) => {
-    if (!roomId) return;
+    if (!roomId || !amDM()) return; // only the DM places tokens
     const token = {
       id: randomUUID(),
       room_id: roomId,
@@ -99,7 +114,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("deleteToken", (id) => {
-    if (!roomId) return;
+    if (!roomId || !amDM()) return;
     store.deleteToken(id);
     io.to(roomId).emit("tokenDeleted", id);
   });
@@ -133,41 +148,50 @@ io.on("connection", (socket) => {
   });
 
   // --- Character sheets ----------------------------------------------------
+  // Players may edit only their own sheets; the DM may edit anyone's. Sheets
+  // created before roles existed have no owner and stay editable by all.
+  function mayEditChar(id) {
+    if (amDM() || !id) return true;
+    const existing = store.getCharacters(roomId).find((c) => c.id === id);
+    if (!existing || !existing.owner) return true;
+    return existing.owner === names.get(socket.id);
+  }
   socket.on("saveCharacter", ({ id, data }) => {
-    if (!roomId) return;
+    if (!roomId || !mayEditChar(id)) return;
     const charId = id || randomUUID();
+    if (!data.owner) data.owner = names.get(socket.id); // stamp creator
     store.upsertCharacter(charId, roomId, data);
     io.to(roomId).emit("characterSaved", { id: charId, ...data });
   });
 
   socket.on("deleteCharacter", (id) => {
-    if (!roomId) return;
+    if (!roomId || !mayEditChar(id)) return;
     store.deleteCharacter(id);
     io.to(roomId).emit("characterDeleted", id);
   });
 
-  // --- Creatures (monsters / NPCs) -----------------------------------------
+  // --- Creatures (monsters / NPCs) — DM only -------------------------------
   socket.on("saveCreature", ({ id, data }) => {
-    if (!roomId) return;
+    if (!roomId || !amDM()) return;
     const cid = id || randomUUID();
     store.upsertCreature(cid, roomId, data);
     io.to(roomId).emit("creatureSaved", { id: cid, ...data });
   });
   socket.on("deleteCreature", (id) => {
-    if (!roomId) return;
+    if (!roomId || !amDM()) return;
     store.deleteCreature(id);
     io.to(roomId).emit("creatureDeleted", id);
   });
 
-  // --- Saved maps ----------------------------------------------------------
+  // --- Saved maps — DM only ------------------------------------------------
   socket.on("saveMap", ({ name, url }) => {
-    if (!roomId || !url) return;
+    if (!roomId || !amDM() || !url) return;
     const id = randomUUID();
     store.saveMapEntry(id, roomId, name || "Map", url);
     io.to(roomId).emit("mapSaved", { id, name: name || "Map", url });
   });
   socket.on("deleteMap", (id) => {
-    if (!roomId) return;
+    if (!roomId || !amDM()) return;
     store.deleteMapEntry(id);
     io.to(roomId).emit("mapDeleted", id);
   });
@@ -177,7 +201,7 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("initState", getInit(roomId));
   }
   socket.on("initAdd", ({ name, init, hp, ac }) => {
-    if (!roomId) return;
+    if (!roomId || !amDM()) return;
     const state = getInit(roomId);
     state.entries.push({
       id: randomUUID(),
@@ -190,7 +214,7 @@ io.on("connection", (socket) => {
     pushInit();
   });
   socket.on("initUpdate", ({ id, field, value }) => {
-    if (!roomId) return;
+    if (!roomId || !amDM()) return;
     const state = getInit(roomId);
     const e = state.entries.find((x) => x.id === id);
     if (!e) return;
@@ -199,14 +223,14 @@ io.on("connection", (socket) => {
     pushInit();
   });
   socket.on("initRemove", (id) => {
-    if (!roomId) return;
+    if (!roomId || !amDM()) return;
     const state = getInit(roomId);
     state.entries = state.entries.filter((e) => e.id !== id);
     if (state.turn >= state.entries.length) state.turn = 0;
     pushInit();
   });
   socket.on("initNext", () => {
-    if (!roomId) return;
+    if (!roomId || !amDM()) return;
     const state = getInit(roomId);
     if (!state.entries.length) return;
     state.started = true; // lock in the order so late arrivals don't move the highlight
@@ -215,7 +239,7 @@ io.on("connection", (socket) => {
     pushInit();
   });
   socket.on("initClear", () => {
-    if (!roomId) return;
+    if (!roomId || !amDM()) return;
     initiatives.set(roomId, { round: 1, turn: 0, started: false, entries: [] });
     pushInit();
   });
@@ -251,6 +275,7 @@ io.on("connection", (socket) => {
       io.to(roomId).emit("chat", sys(`${names.get(socket.id)} left`));
     }
     names.delete(socket.id);
+    dmFlags.delete(socket.id);
   });
 });
 

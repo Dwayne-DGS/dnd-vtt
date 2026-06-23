@@ -38,14 +38,20 @@ export function initInitiative(socket) {
         <span class="init-nm">${esc(e.name)}</span>
         <input class="init-hp" data-f="hp" value="${attr(e.hp)}" placeholder="HP" title="Hit points"/>
         <button class="del" title="Remove">✕</button>`;
-      row.querySelectorAll("input").forEach((inp) =>
-        inp.addEventListener("change", () =>
-          socket.emit("initUpdate", { id: e.id, field: inp.dataset.f, value: inp.value })
-        )
-      );
-      row.querySelector(".del").addEventListener("click", () =>
-        socket.emit("initRemove", e.id)
-      );
+      if (window.isDM) {
+        row.querySelectorAll("input").forEach((inp) =>
+          inp.addEventListener("change", () =>
+            socket.emit("initUpdate", { id: e.id, field: inp.dataset.f, value: inp.value })
+          )
+        );
+        row.querySelector(".del").addEventListener("click", () =>
+          socket.emit("initRemove", e.id)
+        );
+      } else {
+        // Players see the order but can't change it.
+        row.querySelectorAll("input").forEach((inp) => (inp.disabled = true));
+        row.querySelector(".del").style.display = "none";
+      }
       list.appendChild(row);
     });
   }

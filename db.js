@@ -47,11 +47,18 @@ db.exec(`
   );
 `);
 
+// Migration: add the DM password column to existing databases that predate it.
+const roomCols = db.prepare("PRAGMA table_info(rooms)").all().map((c) => c.name);
+if (!roomCols.includes("dm_password")) {
+  db.exec("ALTER TABLE rooms ADD COLUMN dm_password TEXT");
+}
+
 // --- Rooms -----------------------------------------------------------------
 const _ensureRoom = db.prepare(
   "INSERT OR IGNORE INTO rooms (id, created_at) VALUES (?, ?)"
 );
 const _setMap = db.prepare("UPDATE rooms SET map_url = ? WHERE id = ?");
+const _setDm = db.prepare("UPDATE rooms SET dm_password = ? WHERE id = ?");
 const _getRoom = db.prepare("SELECT * FROM rooms WHERE id = ?");
 
 export function ensureRoom(roomId) {
@@ -60,6 +67,9 @@ export function ensureRoom(roomId) {
 }
 export function setMap(roomId, url) {
   _setMap.run(url, roomId);
+}
+export function setDmPassword(roomId, pw) {
+  _setDm.run(pw, roomId);
 }
 
 // --- Tokens ----------------------------------------------------------------

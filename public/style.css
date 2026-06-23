@@ -65,6 +65,17 @@ input {
 }
 .brand { font-weight: 700; color: var(--accent-2); }
 .room-label { color: var(--muted); }
+.role-badge { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+.role-badge.dm { background: var(--accent); color: #fff; }
+.role-badge.player { background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); }
+
+/* Permission gating: hide DM-only controls from players. JS adds .is-player
+   to <body> for non-DMs. */
+body.is-player .dm-only { display: none !important; }
+.player-note { color: var(--muted); font-size: 12px; font-style: italic; margin: 4px 0; display: none; }
+body.is-player .player-note { display: block; }
+
+.join-hint { color: var(--muted); font-size: 12px; text-align: left; margin: 8px 0 0; }
 .map-controls { margin-left: auto; display: flex; gap: 8px; }
 .map-controls input { width: 220px; }
 

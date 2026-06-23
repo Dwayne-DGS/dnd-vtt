@@ -14,6 +14,24 @@ const socket = io({ autoConnect: false });
 const joinScreen = document.getElementById("join-screen");
 const app = document.getElementById("app");
 
+// Role is decided by the server from the DM password. We mirror it to the body
+// class (CSS hides .dm-only controls for players) and to window.isDM /
+// window.playerName for the feature modules to read. Registered before connect
+// so we never miss the event.
+window.isDM = false;
+window.playerName = "Player";
+socket.on("role", ({ isDM, name, dmDenied }) => {
+  window.isDM = !!isDM;
+  window.playerName = name;
+  document.body.classList.toggle("is-player", !isDM);
+  const badge = document.getElementById("role-badge");
+  badge.textContent = isDM ? "DM" : "Player";
+  badge.className = "role-badge " + (isDM ? "dm" : "player");
+  if (dmDenied) {
+    alert("That DM password didn't match this room — you've joined as a player.");
+  }
+});
+
 document.getElementById("join-btn").addEventListener("click", join);
 document.getElementById("join-room").addEventListener("keydown", (e) => {
   if (e.key === "Enter") join();
@@ -22,9 +40,10 @@ document.getElementById("join-room").addEventListener("keydown", (e) => {
 function join() {
   const name = document.getElementById("join-name").value.trim() || "Player";
   const room = document.getElementById("join-room").value.trim() || "lobby";
+  const dmPassword = document.getElementById("join-dm").value;
 
   socket.connect();
-  socket.emit("join", { name, room });
+  socket.emit("join", { name, room, dmPassword });
 
   document.getElementById("room-label").textContent = `Room: ${room}`;
   joinScreen.classList.add("hidden");

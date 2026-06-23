@@ -82,6 +82,7 @@ export function initMap(socket) {
   });
   window.addEventListener("mouseup", () => { dragging = null; });
   canvas.addEventListener("dblclick", (e) => {
+    if (!window.isDM) return; // only the DM removes tokens
     const p = pos(e);
     const t = tokenAt(p.x, p.y);
     if (t && confirm(`Remove token "${t.label}"?`)) socket.emit("deleteToken", t.id);
