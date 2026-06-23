@@ -344,17 +344,19 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("creatureDeleted", id);
   });
 
-  // --- Saved maps — DM only ------------------------------------------------
+  // --- Saved maps — shared library, DM only --------------------------------
+  // Broadcast library changes to ALL clients (every room) so the shared library
+  // stays consistent everywhere.
   socket.on("saveMap", ({ name, url }) => {
     if (!roomId || !amDM() || !url) return;
     const id = randomUUID();
     store.saveMapEntry(id, roomId, name || "Map", url);
-    io.to(roomId).emit("mapSaved", { id, name: name || "Map", url });
+    io.emit("mapSaved", { id, name: name || "Map", url });
   });
   socket.on("deleteMap", (id) => {
     if (!roomId || !amDM()) return;
     store.deleteMapEntry(id);
-    io.to(roomId).emit("mapDeleted", id);
+    io.emit("mapDeleted", id);
   });
 
   // --- Initiative tracker --------------------------------------------------

@@ -5,8 +5,9 @@ the same **room** shares one game in real time:
 
 - **Shared map + tokens** — set a battle-map image (paste a URL **or upload a file**),
   add tokens (colored discs or **uploaded portrait images**), drag them around with
-  optional **grid snapping**. Moves appear instantly for every player. **Map
-  library:** save multiple named maps and switch with one click.
+  optional **grid snapping**, and **rotate** the map in 90° steps. Moves appear
+  instantly for every player. **Shared map library:** saved maps are available in
+  every room — upload once, reuse in any campaign.
 - **Fog of war** — the DM toggles fog on, then paints to reveal areas as the party
   explores. Players see hidden areas blacked out; the DM sees them dimmed.
 - **Bestiary → map** — place any saved creature onto the map as a token in one click.

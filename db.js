@@ -132,7 +132,7 @@ export const deleteRoom = db.transaction((roomId) => {
   _delRoomTokens.run(roomId);
   _delRoomChars.run(roomId);
   _delRoomCreatures.run(roomId);
-  _delRoomMaps.run(roomId);
+  // Saved maps are a shared library, so they are intentionally NOT deleted here.
   _delRoom.run(roomId);
 });
 
@@ -197,15 +197,16 @@ export function deleteCreature(id) {
   _deleteCreature.run(id);
 }
 
-// --- Saved maps ------------------------------------------------------------
-const _getMaps = db.prepare("SELECT * FROM maps WHERE room_id = ?");
+// --- Saved maps (shared library, visible in every room) --------------------
+const _getMapsAll = db.prepare("SELECT * FROM maps ORDER BY name COLLATE NOCASE");
 const _insertMap = db.prepare(
   "INSERT INTO maps (id, room_id, name, url) VALUES (?, ?, ?, ?)"
 );
 const _deleteMapRow = db.prepare("DELETE FROM maps WHERE id = ?");
 
-export function getMaps(roomId) {
-  return _getMaps.all(roomId);
+// roomId is kept for record of origin but the library is shared system-wide.
+export function getMaps() {
+  return _getMapsAll.all();
 }
 export function saveMapEntry(id, roomId, name, url) {
   _insertMap.run(id, roomId, name, url);

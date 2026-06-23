@@ -196,21 +196,28 @@ function enterApp(room) {
     if (name === null) return;
     socket.emit("saveMap", { name, url });
   });
+  let savedMaps = [];
   mapPicker.addEventListener("change", () => {
-    if (!mapPicker.value) return;
-    mapUrl.value = mapPicker.value;
-    socket.emit("setMap", mapPicker.value);
+    const m = savedMaps.find((x) => x.id === mapPicker.value);
+    if (!m) return;
+    mapUrl.value = m.url;
+    socket.emit("setMap", m.url);
+  });
+  // Remove the selected map from the shared library (DM only).
+  document.getElementById("map-remove")?.addEventListener("click", () => {
+    const m = savedMaps.find((x) => x.id === mapPicker.value);
+    if (!m) { alert("Pick a saved map from the dropdown first."); return; }
+    if (confirm(`Remove "${m.name}" from the shared map library?`)) socket.emit("deleteMap", m.id);
   });
 
   function refreshMaps(maps) {
     mapPicker.innerHTML = '<option value="">— saved maps —</option>';
     (maps || []).forEach((m) => {
       const o = document.createElement("option");
-      o.value = m.url; o.textContent = m.name;
+      o.value = m.id; o.textContent = m.name;
       mapPicker.appendChild(o);
     });
   }
-  let savedMaps = [];
   socket.on("state", (s) => { savedMaps = s.maps || []; refreshMaps(savedMaps); });
   socket.on("mapSaved", (m) => { savedMaps.push(m); refreshMaps(savedMaps); });
   socket.on("mapDeleted", (id) => {

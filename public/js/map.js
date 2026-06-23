@@ -14,6 +14,7 @@ export function initMap(socket) {
   let fog = { enabled: false, revealed: new Set() };
   let revealMode = false;     // DM is painting revealed area
   let painting = false;
+  let rotation = 0;           // map rotation in degrees (0/90/180/270)
 
   const TOKEN_R = 22;
   const GRID = 50;            // visible grid + snap cell size (screen px)
@@ -37,12 +38,19 @@ export function initMap(socket) {
   }
   window.addEventListener("resize", resize);
 
-  // The rectangle the map (or grid) occupies on screen — fog cells map onto this.
+  // The rectangle the map's on-screen footprint occupies — fog cells map onto
+  // this. For 90°/270° the footprint width/height are swapped.
   function mapRect() {
     if (mapImg && mapImg.complete && mapImg.naturalWidth) {
-      const scale = Math.min(canvas.width / mapImg.width, canvas.height / mapImg.height);
-      const w = mapImg.width * scale, h = mapImg.height * scale;
-      return { x: (canvas.width - w) / 2, y: (canvas.height - h) / 2, w, h };
+      const iw = mapImg.width, ih = mapImg.height;
+      const swapped = rotation === 90 || rotation === 270;
+      // Scale so the (possibly rotated) image fits the canvas.
+      const scale = swapped
+        ? Math.min(canvas.width / ih, canvas.height / iw)
+        : Math.min(canvas.width / iw, canvas.height / ih);
+      const fw = (swapped ? ih : iw) * scale; // footprint width on screen
+      const fh = (swapped ? iw : ih) * scale; // footprint height on screen
+      return { x: (canvas.width - fw) / 2, y: (canvas.height - fh) / 2, w: fw, h: fh, scale, iw, ih };
     }
     return { x: 0, y: 0, w: canvas.width, h: canvas.height };
   }
@@ -50,8 +58,15 @@ export function initMap(socket) {
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const rect = mapRect();
-    if (mapImg && mapImg.complete) ctx.drawImage(mapImg, rect.x, rect.y, rect.w, rect.h);
-    else drawGrid();
+    if (mapImg && mapImg.complete) {
+      // Rotate about the canvas center, then draw the image centered.
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((rotation * Math.PI) / 180);
+      const dw = rect.iw * rect.scale, dh = rect.ih * rect.scale;
+      ctx.drawImage(mapImg, -dw / 2, -dh / 2, dw, dh);
+      ctx.restore();
+    } else drawGrid();
 
     for (const t of tokens) drawToken(t);
 
@@ -189,6 +204,9 @@ export function initMap(socket) {
     snapEnabled = !snapEnabled;
     snapBtn.classList.toggle("active", snapEnabled);
   });
+  document.getElementById("map-rotate")?.addEventListener("click", () =>
+    socket.emit("setMapRotation", (rotation + 90) % 360)
+  );
   fogBtn?.addEventListener("click", () => socket.emit("fogSet", !fog.enabled));
   revealBtn?.addEventListener("click", () => {
     revealMode = !revealMode;
@@ -204,8 +222,14 @@ export function initMap(socket) {
   }
 
   // --- Socket events -------------------------------------------------------
-  socket.on("state", (s) => { tokens = s.tokens || []; setMap(s.mapUrl); applyFog(s.fog || {}); });
+  socket.on("state", (s) => {
+    tokens = s.tokens || [];
+    rotation = s.mapRotation || 0;
+    setMap(s.mapUrl);
+    applyFog(s.fog || {});
+  });
   socket.on("mapUrl", setMap);
+  socket.on("mapRotation", (deg) => { rotation = deg || 0; draw(); });
   socket.on("fogState", applyFog);
   socket.on("tokenAdded", (t) => { tokens.push(t); draw(); });
   socket.on("tokenMoved", ({ id, x, y }) => {
