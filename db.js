@@ -56,6 +56,8 @@ addRoomCol("init_state");
 addRoomCol("fog_state");
 if (!roomCols.includes("last_active")) db.exec("ALTER TABLE rooms ADD COLUMN last_active INTEGER");
 if (!roomCols.includes("map_rotation")) db.exec("ALTER TABLE rooms ADD COLUMN map_rotation INTEGER DEFAULT 0");
+if (!roomCols.includes("grid_on")) db.exec("ALTER TABLE rooms ADD COLUMN grid_on INTEGER DEFAULT 0");
+if (!roomCols.includes("grid_size")) db.exec("ALTER TABLE rooms ADD COLUMN grid_size INTEGER DEFAULT 64");
 const tokenCols = db.prepare("PRAGMA table_info(tokens)").all().map((c) => c.name);
 if (!tokenCols.includes("img")) {
   db.exec("ALTER TABLE tokens ADD COLUMN img TEXT");
@@ -82,6 +84,10 @@ export function setMap(roomId, url) {
 }
 export function setMapRotation(roomId, deg) {
   _setRotation.run(deg, roomId);
+}
+const _setGrid = db.prepare("UPDATE rooms SET grid_on = ?, grid_size = ? WHERE id = ?");
+export function setGrid(roomId, on, size) {
+  _setGrid.run(on ? 1 : 0, size, roomId);
 }
 export function getRoom(roomId) {
   return _getRoom.get(roomId);

@@ -127,6 +127,8 @@ io.on("connection", (socket) => {
       room: roomId,
       mapUrl: store.getRoom(roomId)?.map_url,
       mapRotation: store.getRoom(roomId)?.map_rotation || 0,
+      gridOn: !!store.getRoom(roomId)?.grid_on,
+      gridSize: store.getRoom(roomId)?.grid_size || 64,
       tokens: store.getTokens(roomId),
       characters: store.getCharacters(roomId),
       creatures: store.getCreatures(roomId),
@@ -282,6 +284,12 @@ io.on("connection", (socket) => {
     const d = ((Number(deg) % 360) + 360) % 360; // normalize to 0/90/180/270
     store.setMapRotation(roomId, d);
     io.to(roomId).emit("mapRotation", d);
+  });
+  socket.on("setGrid", ({ on, size }) => {
+    if (!roomId || !amDM()) return;
+    const s = Math.max(16, Math.min(256, Number(size) || 64));
+    store.setGrid(roomId, on, s);
+    io.to(roomId).emit("gridState", { on: !!on, size: s });
   });
 
   // --- Fog of war (DM only) ------------------------------------------------

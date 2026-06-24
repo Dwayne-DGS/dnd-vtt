@@ -2,6 +2,8 @@
 // the DM edits anyone's (enforced server-side). Includes abilities, saving
 // throws, all 18 skills, spell slots, and inventory, each with roll buttons.
 
+import { openCharacterSheet } from "./sheet.js";
+
 const ABILITIES = ["STR", "DEX", "CON", "INT", "WIS", "CHA"];
 const SKILLS = [
   ["Acrobatics", "DEX"], ["Animal Handling", "WIS"], ["Arcana", "INT"],
@@ -90,6 +92,9 @@ export function initCharacters(socket) {
         <textarea data-f="inventory" rows="4">${esc(c.inventory || "")}</textarea>
       </details>
       <div class="char-actions">
+        <button data-act="open">📖 Open full sheet</button>
+      </div>
+      <div class="char-actions">
         <button data-act="save">Save</button>
         <button class="btn-secondary" data-act="del">Delete</button>
       </div>`;
@@ -146,6 +151,9 @@ export function initCharacters(socket) {
       })
     );
 
+    el.querySelector('[data-act="open"]').addEventListener("click", () =>
+      openCharacterSheet(socket, c, canEdit)
+    );
     el.querySelector('[data-act="save"]').addEventListener("click", () =>
       socket.emit("saveCharacter", { id: c.id, data: collect() })
     );

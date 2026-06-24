@@ -15,6 +15,7 @@ export function initMap(socket) {
   let revealMode = false;     // DM is painting revealed area
   let painting = false;
   let rotation = 0;           // map rotation in degrees (0/90/180/270)
+  let grid = { on: false, size: 64 }; // overlay grid; size is in MAP pixels
 
   const TOKEN_R = 22;
   const GRID = 50;            // visible grid + snap cell size (screen px)
@@ -66,6 +67,7 @@ export function initMap(socket) {
       const dw = rect.iw * rect.scale, dh = rect.ih * rect.scale;
       ctx.drawImage(mapImg, -dw / 2, -dh / 2, dw, dh);
       ctx.restore();
+      if (grid.on) drawOverlayGrid(rect);
     } else drawGrid();
 
     for (const t of tokens) drawToken(t);
@@ -101,6 +103,24 @@ export function initMap(socket) {
       ctx.textBaseline = "middle";
       ctx.fillText(t.label.slice(0, 3), t.x, t.y);
     }
+  }
+
+  // Overlay grid for maps that have no printed grid. Cell size is in map pixels
+  // and scaled by the map's fit, so it lines up with the art on every screen.
+  function drawOverlayGrid(rect) {
+    const cell = Math.max(4, grid.size * (rect.scale || 1));
+    ctx.save();
+    ctx.strokeStyle = "rgba(20,16,12,0.45)";
+    ctx.lineWidth = 1;
+    for (let x = rect.x; x <= rect.x + rect.w + 0.5; x += cell) {
+      const px = Math.round(x) + 0.5;
+      ctx.beginPath(); ctx.moveTo(px, rect.y); ctx.lineTo(px, rect.y + rect.h); ctx.stroke();
+    }
+    for (let y = rect.y; y <= rect.y + rect.h + 0.5; y += cell) {
+      const py = Math.round(y) + 0.5;
+      ctx.beginPath(); ctx.moveTo(rect.x, py); ctx.lineTo(rect.x + rect.w, py); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function drawGrid() {
@@ -215,6 +235,17 @@ export function initMap(socket) {
   });
   document.getElementById("fog-reset")?.addEventListener("click", () => socket.emit("fogReset"));
 
+  const gridBtn = document.getElementById("grid-toggle");
+  gridBtn?.addEventListener("click", () => socket.emit("setGrid", { on: !grid.on, size: grid.size }));
+  document.getElementById("grid-minus")?.addEventListener("click", () => socket.emit("setGrid", { on: true, size: grid.size - 4 }));
+  document.getElementById("grid-plus")?.addEventListener("click", () => socket.emit("setGrid", { on: true, size: grid.size + 4 }));
+
+  function applyGrid(g) {
+    grid = { on: !!g.on, size: g.size || 64 };
+    gridBtn?.classList.toggle("active", grid.on);
+    draw();
+  }
+
   function applyFog(f) {
     fog = { enabled: !!f.enabled, revealed: new Set(f.revealed || []) };
     fogBtn?.classList.toggle("active", fog.enabled);
@@ -225,11 +256,14 @@ export function initMap(socket) {
   socket.on("state", (s) => {
     tokens = s.tokens || [];
     rotation = s.mapRotation || 0;
+    grid = { on: !!s.gridOn, size: s.gridSize || 64 };
+    gridBtn?.classList.toggle("active", grid.on);
     setMap(s.mapUrl);
     applyFog(s.fog || {});
   });
   socket.on("mapUrl", setMap);
   socket.on("mapRotation", (deg) => { rotation = deg || 0; draw(); });
+  socket.on("gridState", applyGrid);
   socket.on("fogState", applyFog);
   socket.on("tokenAdded", (t) => { tokens.push(t); draw(); });
   socket.on("tokenMoved", ({ id, x, y }) => {

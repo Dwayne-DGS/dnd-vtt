@@ -67,6 +67,9 @@
         <button id="map-rotate" class="btn-secondary dm-only" title="Rotate the map 90°">⟳</button>
         <button id="add-token" class="dm-only">+ Token</button>
         <button id="add-portrait" class="dm-only" title="Add a token with a portrait image">+ 📷</button>
+        <button id="grid-toggle" class="btn-secondary dm-only" title="Overlay a grid (for maps without one)">⊞ Grid</button>
+        <button id="grid-minus" class="btn-secondary dm-only" title="Smaller grid squares">−</button>
+        <button id="grid-plus" class="btn-secondary dm-only" title="Larger grid squares">+</button>
         <button id="snap-toggle" class="btn-secondary" title="Snap tokens to the grid when you drop them">▦ Snap</button>
         <button id="fog-toggle" class="btn-secondary dm-only" title="Turn fog of war on/off">🌫 Fog</button>
         <button id="fog-reveal" class="btn-secondary dm-only" title="Paint to reveal areas (drag on the map)">Reveal</button>
@@ -195,6 +198,7 @@
   </div>
 
   <div id="fx-flash" class="fx-flash"></div>
+  <div id="sheet-modal" class="sheet-modal hidden"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script type="module" src="/js/main.js"></script>

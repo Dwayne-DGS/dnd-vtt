@@ -174,6 +174,47 @@ body.is-player .player-note { display: block; }
 .fx-buttons button { padding: 14px 8px; font-size: 14px; }
 .fx-flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.25s ease; z-index: 80; }
 
+/* Pop-out character sheet */
+.sheet-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 90; display: flex; align-items: flex-start; justify-content: center; padding: 24px; overflow-y: auto; }
+.sheet-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 24px; width: 760px; max-width: 100%; }
+.sheet-card h3 { margin: 20px 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.sheet-card h3 small { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+.sh-head { display: flex; gap: 12px; align-items: center; }
+.sh-name { flex: 1; font-size: 22px; font-weight: 700; background: var(--panel-2); border: 1px solid var(--border); color: var(--ink); border-radius: 8px; padding: 10px; }
+.sh-headbtns { display: flex; gap: 8px; }
+.sh-headbtns button, .sh-save { padding: 10px 16px; }
+.sh-intro { background: var(--panel-2); border-left: 3px solid var(--accent-2); padding: 10px 12px; border-radius: 6px; font-size: 13px; color: var(--ink); }
+.sh-readonly { color: var(--muted); font-size: 13px; font-style: italic; }
+.sh-core { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 10px 0; }
+.sh-core label { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--muted); }
+.sh-core input { background: var(--panel-2); border: 1px solid var(--border); color: var(--ink); border-radius: 6px; padding: 8px; font-size: 16px; }
+.sh-core small { color: var(--muted); font-size: 11px; }
+.sh-abils { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.sh-abil { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.sh-abil-top { display: flex; justify-content: space-between; align-items: center; }
+.sh-abil-name { font-weight: 700; } .sh-abil-name small { color: var(--muted); }
+.sh-abil-mod { font-size: 22px; font-weight: 800; color: var(--accent-2); }
+.sh-abil input { width: 100%; text-align: center; font-size: 18px; background: var(--panel); border: 1px solid var(--border); color: var(--ink); border-radius: 6px; padding: 6px; margin: 6px 0; }
+.sh-desc { color: var(--muted); font-size: 12px; margin: 4px 0; }
+.sh-roll { width: 100%; background: var(--panel); border: 1px solid var(--border); color: var(--ink); padding: 6px; font-size: 12px; }
+.sh-roll:hover { background: var(--accent); }
+.sh-list { display: flex; flex-direction: column; gap: 4px; }
+.sh-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 6px; }
+.sh-row:hover { background: var(--panel-2); }
+.sh-row.skill { align-items: flex-start; }
+.sh-row-main { flex: 1; display: flex; flex-direction: column; }
+.sh-row-name { flex: 1; } .sh-row-name small { color: var(--muted); }
+.sh-row .sh-desc { margin: 0; }
+.sh-row-mod { width: 36px; text-align: right; font-weight: 700; color: var(--accent-2); }
+.sh-roll.sm { width: auto; padding: 4px 8px; }
+.sh-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sh-slot { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+.sh-slot label { color: var(--muted); }
+.sh-slot input { width: 42px; text-align: center; background: var(--panel); border: 1px solid var(--border); color: var(--ink); border-radius: 4px; padding: 4px; }
+.sheet-card textarea { width: 100%; background: var(--panel-2); border: 1px solid var(--border); color: var(--ink); border-radius: 8px; padding: 10px; font-family: inherit; font-size: 14px; resize: vertical; }
+.sh-savebar { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+.sh-saved { color: #9be8a8; font-size: 13px; }
+
 .bestiary-top { display: flex; gap: 6px; margin-bottom: 8px; }
 .bestiary-top select { flex: 1; }
 .creature-kind { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; font-size: 12px; color: var(--muted); }
