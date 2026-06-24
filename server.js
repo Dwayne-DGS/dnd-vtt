@@ -238,6 +238,7 @@ io.on("connection", (socket) => {
         socket.emit("aiError", "Unknown AI action.");
       }
     } catch (e) {
+      console.error("AI error:", e.message);
       socket.emit("aiError", e.message || "AI request failed.");
     }
   });
@@ -571,11 +572,24 @@ async function callClaude({ system, prompt, tool }) {
   if (!key) throw new Error("The AI isn't set up on this server yet.");
   const body = { model: CLAUDE_MODEL, max_tokens: 1800, system, messages: [{ role: "user", content: prompt }] };
   if (tool) { body.tools = [tool]; body.tool_choice = { type: "tool", name: tool.name }; }
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
+
+  // Give up after 30s instead of hanging forever.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  let r;
+  try {
+    r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("The AI took too long (over 30s). Try again, or switch to the faster Haiku model.");
+    throw new Error("Couldn't reach the AI service: " + e.message);
+  } finally {
+    clearTimeout(timer);
+  }
   if (!r.ok) {
     const t = await r.text().catch(() => "");
     if (r.status === 401) throw new Error("AI key was rejected — check claude.key.");
