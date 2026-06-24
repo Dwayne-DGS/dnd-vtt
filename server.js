@@ -37,7 +37,7 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 // Note: setting a map / placing a token is still DM-gated over the socket, so an
 // uploaded image is inert until a DM actually uses it.
 const UPLOAD_DIR = join(__dirname, "public", "uploads");
-const MAX_UPLOAD = 10 * 1024 * 1024; // 10 MB
+const MAX_UPLOAD = 30 * 1024 * 1024; // 30 MB
 app.post("/upload", (req, res) => {
   const type = (req.headers["content-type"] || "").toLowerCase();
   if (!type.startsWith("image/")) {
@@ -54,7 +54,7 @@ app.post("/upload", (req, res) => {
       aborted = true;
       out.destroy();
       req.destroy();
-      res.status(413).json({ error: "File too large (max 10 MB)" });
+      res.status(413).json({ error: "File too large (max 30 MB)" });
     }
   });
   req.pipe(out);

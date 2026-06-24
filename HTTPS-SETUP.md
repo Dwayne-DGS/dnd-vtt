@@ -89,7 +89,7 @@ nginx -t && systemctl reload nginx
 which makes map/portrait image uploads fail. Raise it once:
 
 ```bash
-echo 'client_max_body_size 15M;' > /etc/nginx/conf.d/upload-size.conf
+echo 'client_max_body_size 30M;' > /etc/nginx/conf.d/upload-size.conf
 nginx -t && systemctl reload nginx
 ```
 
