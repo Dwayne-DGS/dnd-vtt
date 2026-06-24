@@ -189,6 +189,59 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("chat", sys(`${pname} joined${isDM ? " (DM)" : ""}`));
   });
 
+  // --- Spell lighting effects ----------------------------------------------
+  // The DM fires an effect; it's broadcast to the room. Browsers flash the
+  // screen, and any connected Hue helper drives the lights. The helper joins a
+  // room purely to listen (no password needed — it can only receive).
+  socket.on("hueSubscribe", (room) => {
+    const r = (room || "").trim().toLowerCase();
+    if (r) socket.join(r);
+  });
+  socket.on("castEffect", (effect) => {
+    if (!roomId || !amDM() || !effect) return;
+    io.to(roomId).emit("spellEffect", String(effect));
+  });
+
+  // --- AI assistant --------------------------------------------------------
+  // Players can create their own characters and ask rules questions; the DM can
+  // also generate creatures and story/encounter ideas. Rate-limited per socket.
+  let aiLast = 0;
+  socket.on("aiRequest", async ({ mode, prompt }) => {
+    if (!roomId) return;
+    if (!claudeKey()) return socket.emit("aiError", "The AI isn't set up on this server yet.");
+    const text = String(prompt || "").trim();
+    if (!text) return socket.emit("aiError", "Type a description or question first.");
+    if ((mode === "creature" || mode === "story") && !amDM()) {
+      return socket.emit("aiError", "Only the DM can use that.");
+    }
+    const now = Date.now();
+    if (now - aiLast < 3000) return socket.emit("aiError", "Please wait a few seconds between AI requests.");
+    aiLast = now;
+    socket.emit("aiBusy", mode);
+    try {
+      if (mode === "character") {
+        const data = mapCharacter(await callClaude({ system: AI_SYS.character, prompt: text, tool: CHARACTER_TOOL }), names.get(socket.id));
+        const id = randomUUID();
+        store.upsertCharacter(id, roomId, data);
+        io.to(roomId).emit("characterSaved", { id, ...data });
+        socket.emit("aiDone", { mode, message: `Created “${data.name}”. Open the PCs tab to see it.` });
+      } else if (mode === "creature") {
+        const data = mapCreature(await callClaude({ system: AI_SYS.creature, prompt: text, tool: CREATURE_TOOL }));
+        const id = randomUUID();
+        store.upsertCreature(id, roomId, data);
+        io.to(roomId).emit("creatureSaved", { id, ...data });
+        socket.emit("aiDone", { mode, message: `Added “${data.name}” to the Bestiary.` });
+      } else if (mode === "rules" || mode === "story") {
+        const answer = await callClaude({ system: AI_SYS[mode], prompt: text });
+        socket.emit("aiAnswer", { mode, text: answer });
+      } else {
+        socket.emit("aiError", "Unknown AI action.");
+      }
+    } catch (e) {
+      socket.emit("aiError", e.message || "AI request failed.");
+    }
+  });
+
   // --- Owner room management (admin.key password) --------------------------
   function checkAdmin(pw) {
     const real = adminPassword();
@@ -446,6 +499,126 @@ io.on("connection", (socket) => {
 function sys(text) {
   return { type: "system", text, ts: Date.now() };
 }
+
+// ===========================================================================
+//  AI assistant (Anthropic Claude). The API key lives in a `claude.key` file in
+//  the app dir (kept out of git). If absent, AI features are simply disabled.
+// ===========================================================================
+const CLAUDE_KEY_FILE = join(__dirname, "claude.key");
+const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
+function claudeKey() {
+  try { return existsSync(CLAUDE_KEY_FILE) ? readFileSync(CLAUDE_KEY_FILE, "utf8").trim() : null; }
+  catch { return null; }
+}
+
+const ABILS = ["STR", "DEX", "CON", "INT", "WIS", "CHA"];
+const SKILL_NAMES = [
+  "Acrobatics", "Animal Handling", "Arcana", "Athletics", "Deception", "History",
+  "Insight", "Intimidation", "Investigation", "Medicine", "Nature", "Perception",
+  "Performance", "Persuasion", "Religion", "Sleight of Hand", "Stealth", "Survival",
+];
+const abilityProps = {
+  type: "object",
+  properties: Object.fromEntries(ABILS.map((a) => [a, { type: "integer" }])),
+  required: ABILS,
+};
+
+const CHARACTER_TOOL = {
+  name: "save_character",
+  description: "Save a complete, rules-legal D&D 5e (SRD) player character.",
+  input_schema: {
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      class: { type: "string", description: "e.g. Barbarian, Wizard" },
+      level: { type: "integer" },
+      armor_class: { type: "integer" },
+      hit_points: { type: "integer", description: "maximum HP for the class/level" },
+      proficiency_bonus: { type: "integer" },
+      abilities: abilityProps,
+      saving_throw_proficiencies: { type: "array", items: { type: "string", enum: ABILS } },
+      skill_proficiencies: { type: "array", items: { type: "string", enum: SKILL_NAMES } },
+      spell_slots: {
+        type: "array",
+        items: { type: "object", properties: { level: { type: "integer" }, total: { type: "integer" } }, required: ["level", "total"] },
+      },
+      inventory_and_notes: { type: "string", description: "equipment, key features, and a one-line background" },
+    },
+    required: ["name", "class", "level", "armor_class", "hit_points", "proficiency_bonus", "abilities"],
+  },
+};
+const CREATURE_TOOL = {
+  name: "save_creature",
+  description: "Save a D&D 5e (SRD) monster or NPC stat block.",
+  input_schema: {
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      kind: { type: "string", enum: ["Monster", "NPC"] },
+      type: { type: "string", description: "e.g. Medium humanoid, Large dragon" },
+      armor_class: { type: "integer" },
+      hit_points: { type: "integer" },
+      speed: { type: "string", description: "e.g. 30 ft" },
+      abilities: abilityProps,
+      actions_and_notes: { type: "string", description: "attacks, special abilities, and notes" },
+    },
+    required: ["name", "kind", "armor_class", "hit_points", "abilities"],
+  },
+};
+
+async function callClaude({ system, prompt, tool }) {
+  const key = claudeKey();
+  if (!key) throw new Error("The AI isn't set up on this server yet.");
+  const body = { model: CLAUDE_MODEL, max_tokens: 1800, system, messages: [{ role: "user", content: prompt }] };
+  if (tool) { body.tools = [tool]; body.tool_choice = { type: "tool", name: tool.name }; }
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const t = await r.text().catch(() => "");
+    if (r.status === 401) throw new Error("AI key was rejected — check claude.key.");
+    if (r.status === 429) throw new Error("AI is rate-limited or out of credit. Try again shortly.");
+    throw new Error(`AI request failed (${r.status}). ${t.slice(0, 160)}`);
+  }
+  const data = await r.json();
+  if (tool) {
+    const block = (data.content || []).find((c) => c.type === "tool_use");
+    if (!block) throw new Error("AI did not return structured data.");
+    return block.input;
+  }
+  return (data.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n").trim();
+}
+
+function mapCharacter(c, owner) {
+  const ab = {}; ABILS.forEach((a) => (ab[a] = Number(c.abilities?.[a]) || 10));
+  const saves = {}; (c.saving_throw_proficiencies || []).forEach((s) => { if (ABILS.includes(s)) saves[s] = true; });
+  const skills = {}; (c.skill_proficiencies || []).forEach((s) => { if (SKILL_NAMES.includes(s)) skills[s] = true; });
+  const slots = {};
+  (c.spell_slots || []).forEach((s) => { if (s.level >= 1 && s.level <= 9 && s.total > 0) slots[s.level] = { used: 0, total: Number(s.total) }; });
+  return {
+    name: c.name || "Adventurer", cls: c.class || "", level: Number(c.level) || 1,
+    ac: Number(c.armor_class) || 10, hp: Number(c.hit_points) || 10, hpMax: Number(c.hit_points) || 10,
+    prof: Number(c.proficiency_bonus) || 2, abilities: ab, saves, skills, slots,
+    inventory: c.inventory_and_notes || "", owner,
+  };
+}
+function mapCreature(c) {
+  const ab = {}; ABILS.forEach((a) => (ab[a] = Number(c.abilities?.[a]) || 10));
+  return {
+    name: c.name || "Creature", kind: c.kind === "NPC" ? "NPC" : "Monster", type: c.type || "",
+    ac: Number(c.armor_class) || 10, hp: Number(c.hit_points) || 10, speed: c.speed || "30 ft",
+    abilities: ab, actions: c.actions_and_notes || "",
+  };
+}
+
+const AI_SYS = {
+  character: "You build complete, rules-legal D&D 5e SRD player characters from a description. Pick sensible ability scores, compute AC and maximum HP appropriate to the class and level, set the proficiency bonus by level, choose class/background skill and saving-throw proficiencies, include spell slots for casters, and summarize equipment, key features and a one-line background. Use only SRD-safe content.",
+  creature: "You build D&D 5e SRD monster or NPC stat blocks from a description. Provide sensible AC, HP, speed, ability scores, and a concise list of attacks/abilities. Use only SRD-safe content.",
+  rules: "You are a concise D&D 5e rules assistant using the 5e SRD. Answer briefly and practically. When relevant, mention the matching page on dnd5e.wikidot.com. If something is homebrew or you're unsure, say so.",
+  story: "You are a creative D&D 5e DM assistant. Produce vivid, ready-to-use encounters, loot, plot hooks, or descriptions. Keep it concise and usable at the table.",
+};
 
 httpServer.listen(PORT, () => {
   console.log(`D&D VTT running on http://localhost:${PORT}`);

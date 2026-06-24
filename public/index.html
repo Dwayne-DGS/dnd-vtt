@@ -96,6 +96,8 @@
           <button class="tab" data-tab="init">Initiative</button>
           <button class="tab" data-tab="bestiary">Bestiary</button>
           <button class="tab" data-tab="refs">Refs</button>
+          <button class="tab dm-only" data-tab="fx">FX</button>
+          <button class="tab" data-tab="ai">✨ AI</button>
         </nav>
 
         <!-- Chat + dice -->
@@ -151,6 +153,25 @@
           <div id="creature-list" class="char-list"></div>
         </div>
 
+        <!-- Lighting effects (DM) -->
+        <div id="tab-fx" class="tab-panel">
+          <p class="join-hint">Fire a lighting effect — flashes everyone's screen, and your Philips Hue lights if the helper is running.</p>
+          <div id="fx-buttons" class="fx-buttons"></div>
+        </div>
+
+        <!-- AI assistant -->
+        <div id="tab-ai" class="tab-panel">
+          <p class="join-hint">Describe what you want and let the AI build it. Characters save to the PCs tab; monsters/NPCs save to the Bestiary.</p>
+          <textarea id="ai-prompt" rows="4" placeholder="e.g. A half-orc barbarian, level 3, who grew up on a pirate ship… &#10;or: How does grappling work? &#10;or: Give me a spooky roadside encounter for 4 level-2 PCs."></textarea>
+          <div class="ai-actions">
+            <button data-ai="character">✨ Create character</button>
+            <button class="dm-only" data-ai="creature">✨ Create monster/NPC</button>
+            <button class="btn-secondary" data-ai="rules">Ask a rule</button>
+            <button class="btn-secondary dm-only" data-ai="story">Encounter idea</button>
+          </div>
+          <div id="ai-output" class="ai-output"></div>
+        </div>
+
         <!-- Reference links -->
         <div id="tab-refs" class="tab-panel">
           <p class="ref-intro">Look up a spell or magic item — opens the D&amp;D 5e wiki in a new tab.</p>
@@ -172,6 +193,8 @@
       </aside>
     </main>
   </div>
+
+  <div id="fx-flash" class="fx-flash"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script type="module" src="/js/main.js"></script>

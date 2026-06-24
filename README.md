@@ -24,6 +24,11 @@ the same **room** shares one game in real time:
 - **Reference** — type a spell or magic-item name to look it up on the D&D 5e wiki,
   plus quick links to spell/item/condition indexes.
 - **Text chat** — in-session messaging.
+- **Lighting effects (FX tab)** — the DM fires effects (Fireball, Healing, Lightning…)
+  that flash everyone's screen, and — via the optional **Hue helper** (`hue-helper/`) —
+  drive real Philips Hue lights in the room.
+- **AI assistant (✨ AI tab)** — describe a character or monster and Claude builds the
+  full sheet; ask 5e rules questions; generate encounters. Requires an API key (see below).
 - **Voice & video** — built-in WebRTC voice/video chat (Join voice → mute/camera
   toggles → video tiles over the map). **Requires HTTPS** — see `HTTPS-SETUP.md`.
 - **Rooms, DM & player passwords** — the DM creates a named table and sets a DM
@@ -149,6 +154,28 @@ State lives in `vtt.db` (created automatically). Back it up to keep campaigns.
 ---
 
 ## Roadmap / next phases
+
+## AI assistant (optional)
+
+The **✨ AI** tab can build characters, generate monsters/NPCs, answer 5e rules
+questions, and brainstorm encounters — powered by Anthropic's Claude.
+
+Set it up by dropping your API key into a file on the server (kept out of git):
+
+```bash
+echo "sk-ant-your-key-here" > /opt/dnd-vtt/claude.key
+pm2 restart dnd-vtt
+```
+
+Get a key at [console.anthropic.com](https://console.anthropic.com) (pay-as-you-go;
+a character costs well under a few cents). To change the model, set an env var
+before starting, e.g. `CLAUDE_MODEL=claude-haiku-4-5-20251001` (cheaper/faster) —
+the default is `claude-sonnet-4-6`. If `claude.key` is absent, the AI tab simply
+reports it isn't set up. Players can create their own characters and ask rules
+questions; monsters/NPCs and encounter ideas are DM-only. Requests are
+rate-limited per person.
+
+---
 
 ## Owner room management
 

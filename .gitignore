@@ -12,6 +12,12 @@ public/uploads/
 # Owner admin password — set on the server only, never committed
 admin.key
 
+# Hue helper's local config (bridge key, light choices) stays on that machine
+hue-helper/config.json
+
+# Anthropic API key for the AI assistant — server only, never committed
+claude.key
+
 # The big self-contained installer is only needed for the no-GitHub method
 install-on-server.sh
 

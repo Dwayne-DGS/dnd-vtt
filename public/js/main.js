@@ -8,6 +8,8 @@ import { initInitiative } from "./initiative.js";
 import { initBestiary } from "./bestiary.js";
 import { initReference } from "./reference.js";
 import { initVoice } from "./voice.js";
+import { initFX } from "./fx.js";
+import { initAI } from "./ai.js";
 
 const socket = io({ autoConnect: false });
 
@@ -127,6 +129,8 @@ function enterApp(room) {
   initBestiary(socket);
   initReference();
   initVoice(socket);
+  initFX(socket);
+  initAI(socket);
 
   const mapUrl = document.getElementById("map-url");
   const mapPicker = document.getElementById("map-picker");

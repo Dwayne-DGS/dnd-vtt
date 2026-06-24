@@ -1,0 +1,15 @@
+{
+  "name": "dnd-vtt-hue-helper",
+  "version": "0.1.0",
+  "description": "Local companion that flashes Philips Hue lights in response to D&D VTT spell effects. Includes a small web UI for setup. Runs on a Mac or Raspberry Pi.",
+  "type": "module",
+  "main": "hue-helper.js",
+  "scripts": {
+    "start": "node hue-helper.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io-client": "^4.7.5"
+  }
+}
