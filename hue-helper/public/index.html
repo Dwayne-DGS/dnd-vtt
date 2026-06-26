@@ -88,17 +88,23 @@ async function api(path, body) {
   if (!r.ok) throw new Error(j.error || "Request failed");
   return j;
 }
-async function refresh() {
-  const s = await api("/api/status");
-  $("server").value = s.serverUrl || "";
-  $("room").value = s.room || "";
-  $("bridge-ip").value = s.bridgeIp || "";
+// Only updates the connected/paired badges — safe to run on a timer.
+function setBadges(s) {
   const ss = $("server-status");
   ss.textContent = s.serverConnected ? "Connected ✓" : "Not connected";
   ss.className = "status " + (s.serverConnected ? "ok" : "bad");
   const bs = $("bridge-status");
   bs.textContent = s.paired ? "Paired ✓" : "Not paired";
   bs.className = "status " + (s.paired ? "ok" : "bad");
+}
+// Full re-render — only on load and after you click a button, never on a timer,
+// so it can't wipe checkboxes you're in the middle of choosing.
+async function refresh() {
+  const s = await api("/api/status");
+  $("server").value = s.serverUrl || "";
+  $("room").value = s.room || "";
+  $("bridge-ip").value = s.bridgeIp || "";
+  setBadges(s);
   const box = $("lights"); box.innerHTML = "";
   if (!s.paired) box.innerHTML = "<p class='hint'>Pair the bridge to see your lights.</p>";
   s.lights.forEach((l) => {
@@ -107,6 +113,7 @@ async function refresh() {
     box.appendChild(d);
   });
 }
+async function pollStatus() { try { setBadges(await api("/api/status")); } catch {} }
 $("save-server").onclick = async () => { await api("/api/server", { url:$("server").value, room:$("room").value }); setTimeout(refresh, 600); };
 $("discover").onclick = async () => { try { const r = await api("/api/discover", {}); $("bridge-ip").value = r.ip; } catch(e){ alert(e.message); } };
 $("pair").onclick = async () => { try { await api("/api/pair", { ip:$("bridge-ip").value }); alert("Paired!"); refresh(); } catch(e){ alert(e.message); } };
@@ -122,7 +129,7 @@ EFFECTS.forEach(([id, label]) => {
   fxBox.appendChild(b);
 });
 refresh();
-setInterval(refresh, 5000);
+setInterval(pollStatus, 5000); // status badges only — won't disturb your selections
 </script>
 </body>
 </html>
