@@ -72,6 +72,7 @@ async function bridge(method, path, body) {
 
 const api = (p) => `/api/${config.apiKey}${p}`;
 const getLights = () => bridge("GET", api("/lights"));
+const getGroups = () => bridge("GET", api("/groups"));
 const setLight = (id, state) => bridge("PUT", api(`/lights/${id}/state`), state);
 
 async function controlledIds() {
@@ -173,7 +174,7 @@ app.use(express.json());
 app.use(express.static(join(__dirname, "public")));
 
 app.get("/api/status", async (_req, res) => {
-  let lights = [];
+  let lights = [], groups = [];
   if (config.apiKey && config.bridgeIp) {
     try {
       const data = await getLights();
@@ -181,11 +182,17 @@ app.get("/api/status", async (_req, res) => {
         id, name: l.name, on: l.state?.on, selected: config.lights.includes(id),
       }));
     } catch {}
+    try {
+      const g = await getGroups();
+      groups = Object.entries(g || {})
+        .filter(([, grp]) => grp.type === "Room" || grp.type === "Zone")
+        .map(([id, grp]) => ({ id, name: grp.name, type: grp.type, lights: grp.lights || [] }));
+    } catch {}
   }
   res.json({
     serverUrl: config.serverUrl, room: config.room, serverConnected,
     bridgeIp: config.bridgeIp, paired: !!config.apiKey,
-    controllingAll: config.lights.length === 0, lights,
+    controllingAll: config.lights.length === 0, lights, groups,
   });
 });
 

@@ -27,6 +27,7 @@
   .light input { width:auto; }
   .light .nm { flex:1; }
   .fx { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-top:10px; }
+  .groups { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 12px; }
   .hint { color:var(--muted); font-size:12px; }
 </style>
 </head>
@@ -61,7 +62,8 @@
 
   <div class="card">
     <h2>3. Choose lights</h2>
-    <p class="hint">Check the lights you want effects on. None checked = all lights.</p>
+    <p class="hint">Quick-pick a whole room or zone, or check individual lights below. None checked = all lights.</p>
+    <div id="groups" class="groups"></div>
     <div id="lights" class="lights"></div>
     <button id="save-lights">Save selection</button>
     <button id="recapture" class="sec">Set current lights as "normal"</button>
@@ -111,6 +113,19 @@ async function refresh() {
     const d = document.createElement("div"); d.className = "light";
     d.innerHTML = `<input type="checkbox" ${l.selected ? "checked" : ""} data-id="${l.id}"/><span class="nm">${l.name}</span><span class="hint">${l.on ? "on" : "off"}</span>`;
     box.appendChild(d);
+  });
+  // Room/zone quick-pick buttons — clicking checks that group's lights and saves.
+  const gbox = $("groups"); gbox.innerHTML = "";
+  (s.groups || []).forEach((g) => {
+    const b = document.createElement("button"); b.className = "sec";
+    b.textContent = `${g.name} (${g.lights.length})`;
+    b.onclick = async () => {
+      g.lights.forEach((id) => { const cb = document.querySelector(`#lights input[data-id="${id}"]`); if (cb) cb.checked = true; });
+      const ids = [...document.querySelectorAll("#lights input:checked")].map((c) => c.dataset.id);
+      await api("/api/select", { ids });
+      refresh();
+    };
+    gbox.appendChild(b);
   });
 }
 async function pollStatus() { try { setBadges(await api("/api/status")); } catch {} }
