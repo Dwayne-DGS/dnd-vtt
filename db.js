@@ -174,7 +174,7 @@ export function getFogState(roomId) {
 
 // --- Admin / room management ----------------------------------------------
 const _touch = db.prepare("UPDATE rooms SET last_active = ? WHERE id = ?");
-const _listRooms = db.prepare("SELECT id, created_at, last_active FROM rooms ORDER BY last_active DESC, created_at DESC");
+const _listRooms = db.prepare("SELECT id, owner_id, created_at, last_active FROM rooms ORDER BY last_active DESC, created_at DESC");
 const _delRoom = db.prepare("DELETE FROM rooms WHERE id = ?");
 const _delRoomTokens = db.prepare("DELETE FROM tokens WHERE room_id = ?");
 const _delRoomChars = db.prepare("DELETE FROM characters WHERE room_id = ?");
@@ -189,6 +189,7 @@ export function touchRoom(roomId) {
 export function listRooms() {
   return _listRooms.all().map((r) => ({
     id: r.id,
+    owner_id: r.owner_id || null,
     created_at: r.created_at,
     last_active: r.last_active,
     characters: _countChars.get(r.id).n,

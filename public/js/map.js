@@ -299,8 +299,18 @@ export function initMap(socket) {
     if (dragging) {
       const w = toWorld(p); dragging.x = w.x + dragOffset.x; dragging.y = w.y + dragOffset.y;
       draw(); socket.emit("moveToken", { id: dragging.id, x: dragging.x, y: dragging.y });
+      return;
+    }
+    // Idle hover: show a tooltip for the token under the cursor.
+    if (!drawMode && !tplMode && !wallMode && !lightMode && !revealMode && !measureMode) {
+      const t = tokenAt(toWorld(p));
+      if (t && t.label) {
+        const txt = t.hp_max > 0 ? `${t.label} · HP ${t.hp != null ? t.hp : "?"}/${t.hp_max}` : t.label;
+        window.tipShow && window.tipShow(txt, e.clientX, e.clientY);
+      } else if (window.tipHide) window.tipHide();
     }
   });
+  canvas.addEventListener("mouseleave", () => window.tipHide && window.tipHide());
   window.addEventListener("mouseup", () => {
     if (ruler && measureMode) { ruler = null; draw(); }
     if (stroke) { if (stroke.pts.length > 1) { drawings.push(stroke); socket.emit("drawStroke", stroke); } stroke = null; draw(); }

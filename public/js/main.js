@@ -18,6 +18,7 @@ import { initLoot } from "./loot.js";
 import { initTimer } from "./timer.js";
 import { initDice3d, setDice3dEnabled } from "./dice3d.js";
 import { initHelp } from "./help.js";
+import { initTooltips } from "./tooltip.js";
 
 const socket = io({ autoConnect: false });
 
@@ -43,6 +44,7 @@ function showLanding(user) {
   document.getElementById("mode-create").classList.toggle("hidden", !canCreate);
   if (!canCreate) document.getElementById("mode-join").click();
   document.getElementById("accounts-link").classList.toggle("hidden", user.role !== "admin");
+  document.getElementById("tables-admin-link").classList.toggle("hidden", user.role !== "admin");
   // Players can request GM access (hidden once they're GM/admin).
   const reqBtn = document.getElementById("request-gm");
   reqBtn.classList.toggle("hidden", user.role !== "player");
@@ -88,6 +90,31 @@ function openSettings() {
 }
 
 initHelp(); // Help & Guide overlay (buttons exist on both the dashboard and the in-game top bar).
+initTooltips(); // Styled hover tooltips for every control (upgrades native titles).
+
+// Top-bar dropdown menus: each .menu has a trigger + a popover panel. One open at
+// a time; clicking a button inside performs its action and closes the menu, while
+// inputs/selects keep it open. Outside-click and Esc close everything.
+(function wireMenus() {
+  const closeAll = () => {
+    document.querySelectorAll(".menu-panel.open").forEach((p) => p.classList.remove("open"));
+    document.querySelectorAll(".menu-trigger.active").forEach((t) => t.classList.remove("active"));
+  };
+  document.querySelectorAll(".menu").forEach((menu) => {
+    const trigger = menu.querySelector(".menu-trigger");
+    const panel = menu.querySelector(".menu-panel");
+    if (!trigger || !panel) return;
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const wasOpen = panel.classList.contains("open");
+      closeAll();
+      if (!wasOpen) { panel.classList.add("open"); trigger.classList.add("active"); }
+    });
+    panel.addEventListener("click", (e) => { if (e.target.closest("button")) closeAll(); else e.stopPropagation(); });
+  });
+  document.addEventListener("click", closeAll);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAll(); });
+})();
 document.getElementById("request-gm").addEventListener("click", () => { socket.connect(); socket.emit("requestGm"); });
 socket.on("gmRequested", () => {
   const b = document.getElementById("request-gm");
@@ -100,11 +127,25 @@ socket.on("myTablesList", (tables) => {
   box.innerHTML = "";
   if (!tables.length) { box.innerHTML = "<p class='join-hint' style='margin:0 0 8px'>No tables yet. Create one below, or join a friend's with its name + invite password.</p>"; return; }
   tables.forEach((t) => {
-    const b = document.createElement("button");
-    b.className = "table-row";
-    b.innerHTML = `<span>${escAcct(t.id)}</span><span class="table-role">${t.role === "gm" ? "GM" : "Player"}</span>`;
-    b.addEventListener("click", () => { socket.connect(); socket.emit("enterTable", { room: t.id }); });
-    box.appendChild(b);
+    const row = document.createElement("div");
+    row.className = "table-row";
+    const open = document.createElement("button");
+    open.className = "table-open";
+    open.innerHTML = `<span>${escAcct(t.id)}</span><span class="table-role">${t.role === "gm" ? "GM" : "Player"}</span>`;
+    open.addEventListener("click", () => { socket.connect(); socket.emit("enterTable", { room: t.id }); });
+    row.appendChild(open);
+    if (t.role === "gm") { // owners can delete their own table
+      const del = document.createElement("button");
+      del.className = "table-del"; del.textContent = "🗑"; del.title = "Delete this table";
+      del.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (confirm(`Delete table "${t.id}"? This permanently removes its maps, tokens, characters, monsters, and notes.`)) {
+          socket.connect(); socket.emit("deleteTable", t.id);
+        }
+      });
+      row.appendChild(del);
+    }
+    box.appendChild(row);
   });
 });
 async function authPost(path, body) {
@@ -168,33 +209,39 @@ socket.on("adminUserList", (users) => {
   openAccounts = false;
   accountsListEl.innerHTML = "";
   const fmtDate = (ts) => (ts ? new Date(ts).toLocaleDateString() : "—");
+  // Am I the owner (super-admin)? Only the owner may manage the owner's account.
+  const iAmSuper = users.some((u) => u.is_super && u.username === (window.account && window.account.username));
   users.forEach((u) => {
+    const locked = u.is_super && !iAmSuper; // other admins can't touch the owner
     const row = document.createElement("div");
     row.className = "acct-card";
     const tables = (u.tables || []).map((t) => `${escAcct(t.id)} (${t.role === "gm" ? "GM" : "P"})`).join(", ") || "none";
     const reqBadge = u.gm_requested ? ` <span class="req-badge">wants GM</span>` : "";
+    const ownerBadge = u.is_super ? ` <span class="owner-badge">owner</span>` : "";
     row.innerHTML = `
       <div class="acct-info">
-        <div class="ar-name">${escAcct(u.name || u.username)} <span class="ar-meta">@${escAcct(u.username)}</span>${reqBadge}</div>
+        <div class="ar-name">${escAcct(u.name || u.username)} <span class="ar-meta">@${escAcct(u.username)}</span>${ownerBadge}${reqBadge}</div>
         <div class="ar-meta">${escAcct(u.email || "no email")} · joined ${fmtDate(u.created_at)}</div>
         <div class="ar-meta">tables: ${tables}</div>
       </div>
       <div class="acct-controls">
         ${u.gm_requested ? '<button class="acct-approve">✓ Make GM</button><button class="acct-deny btn-secondary">Deny</button>' : ""}
-        <select class="acct-role">
+        <select class="acct-role"${locked ? " disabled" : ""}>
           <option value="player"${u.role === "player" ? " selected" : ""}>Player</option>
           <option value="gm"${u.role === "gm" ? " selected" : ""}>Game Master</option>
           <option value="admin"${u.role === "admin" ? " selected" : ""}>Admin</option>
         </select>
-        <button class="acct-reset btn-secondary">Reset password</button>
-        <button class="acct-del">Delete</button>
+        ${locked ? '<span class="ar-meta">owner account — managed by the owner only</span>'
+          : '<button class="acct-reset btn-secondary">Reset password</button><button class="acct-del">Delete</button>'}
       </div>`;
-    row.querySelector(".acct-role").addEventListener("change", (e) => socket.emit("adminSetRole", { id: u.id, role: e.target.value }));
-    row.querySelector(".acct-reset").addEventListener("click", () => {
-      const np = prompt(`New password for "${u.username}" (at least 6 characters):`);
-      if (np) socket.emit("adminResetPassword", { id: u.id, newPassword: np });
-    });
-    row.querySelector(".acct-del").addEventListener("click", () => { if (confirm(`Delete account "${u.username}"?`)) socket.emit("adminDeleteUser", u.id); });
+    if (!locked) {
+      row.querySelector(".acct-role").addEventListener("change", (e) => socket.emit("adminSetRole", { id: u.id, role: e.target.value }));
+      row.querySelector(".acct-reset").addEventListener("click", () => {
+        const np = prompt(`New password for "${u.username}" (at least 6 characters):`);
+        if (np) socket.emit("adminResetPassword", { id: u.id, newPassword: np });
+      });
+      row.querySelector(".acct-del").addEventListener("click", () => { if (confirm(`Delete account "${u.username}"?`)) socket.emit("adminDeleteUser", u.id); });
+    }
     row.querySelector(".acct-approve")?.addEventListener("click", () => socket.emit("adminSetRole", { id: u.id, role: "gm" }));
     row.querySelector(".acct-deny")?.addEventListener("click", () => socket.emit("adminDenyGm", u.id));
     accountsListEl.appendChild(row);
@@ -290,14 +337,14 @@ let adminPw = null;
 const adminOverlay = document.getElementById("admin-overlay");
 const adminListEl = document.getElementById("admin-list");
 
-document.getElementById("admin-link").addEventListener("click", () => {
+document.getElementById("admin-link")?.addEventListener("click", () => {
   const pw = prompt("Owner/admin password:");
   if (!pw) return;
   adminPw = pw;
   socket.connect();
   socket.emit("adminList", pw);
 });
-document.getElementById("admin-close").addEventListener("click", () => adminOverlay.classList.add("hidden"));
+document.getElementById("admin-close")?.addEventListener("click", () => adminOverlay.classList.add("hidden"));
 socket.on("adminError", (msg) => alert(msg || "Admin error."));
 socket.on("adminRooms", (rooms) => {
   adminListEl.innerHTML = "";
@@ -316,6 +363,29 @@ socket.on("adminRooms", (rooms) => {
       if (confirm(`Permanently delete room "${r.id}" and all its data?`)) {
         socket.emit("adminDelete", { password: adminPw, room: r.id });
       }
+    });
+    adminListEl.appendChild(row);
+  }
+  adminOverlay.classList.remove("hidden");
+});
+
+// Admin: manage ALL tables (role-gated, no password). Reuses the admin overlay.
+document.getElementById("tables-admin-link")?.addEventListener("click", () => { socket.connect(); socket.emit("adminTables"); });
+socket.on("adminTableList", (rooms) => {
+  adminListEl.innerHTML = "";
+  if (!rooms.length) adminListEl.innerHTML = "<p class='join-hint'>No tables yet.</p>";
+  const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString() : "—";
+  for (const r of rooms) {
+    const row = document.createElement("div");
+    row.className = "admin-room";
+    row.innerHTML = `
+      <div style="flex:1">
+        <div class="ar-name">${escapeHtml(r.id)}</div>
+        <div class="ar-meta">owner: ${escapeHtml(r.owner || "—")} · last active ${fmtDate(r.last_active)} · ${r.characters} PCs, ${r.creatures} creatures</div>
+      </div>
+      <button>Delete</button>`;
+    row.querySelector("button").addEventListener("click", () => {
+      if (confirm(`Permanently delete table "${r.id}" and all its data?`)) socket.emit("deleteTable", r.id);
     });
     adminListEl.appendChild(row);
   }

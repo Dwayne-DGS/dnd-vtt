@@ -69,7 +69,7 @@
       <button id="help-link" class="link-btn">❔ Help &amp; guide</button>
       <button id="request-gm" class="link-btn hidden">Request Game Master access</button>
       <button id="accounts-link" class="link-btn hidden">Manage accounts (admin)</button>
-      <button id="admin-link" class="link-btn">Manage rooms (owner)</button>
+      <button id="tables-admin-link" class="link-btn hidden">Manage all tables (admin)</button>
       <button id="logout-join" class="link-btn">Log out</button>
     </div>
   </div>
@@ -124,48 +124,112 @@
   <!-- Main app -->
   <div id="app" class="app hidden">
     <header class="topbar">
-      <img src="/assets/warcrimes-logo.png" alt="warcrimes.us" class="brand-logo-sm" />
-      <span id="room-label" class="room-label"></span>
-      <span id="role-badge" class="role-badge"></span>
+      <div class="brand-block">
+        <img src="/assets/warcrimes-logo.png" alt="warcrimes.us" class="brand-logo-sm" />
+        <div class="brand-meta">
+          <span id="room-label" class="room-label"></span>
+          <span id="role-badge" class="role-badge"></span>
+        </div>
+      </div>
       <div class="map-controls">
-        <select id="map-picker" title="Saved maps (shared library)">
-          <option value="">— saved maps —</option>
-        </select>
-        <button id="map-remove" class="btn-secondary dm-only" title="Remove the selected saved map from the library">🗑</button>
-        <input id="map-url" class="dm-only" placeholder="Paste a map image URL…" />
-        <button id="map-set" class="dm-only">Set map</button>
-        <button id="map-save" class="btn-secondary dm-only" title="Save this map URL to the library">★</button>
-        <button id="map-upload" class="btn-secondary dm-only" title="Upload a map image from your computer">⬆ Map</button>
-        <button id="map-rotate" class="btn-secondary dm-only" title="Rotate the map 90°">⟳</button>
-        <button id="players-btn" class="btn-secondary dm-only" title="Manage who can join this table">👥 Players</button>
-        <button id="handout-btn" class="btn-secondary dm-only" title="Show an image to all players">🖼 Show</button>
-        <button id="mute-btn" class="btn-secondary" title="Mute sounds">🔊</button>
-        <button id="help-btn" class="btn-secondary" title="Help &amp; guide">❔ Help</button>
-        <button id="logout-btn" class="btn-secondary" title="Log out">⎋ Log out</button>
-        <input type="file" id="handout-file" accept="image/*" hidden />
-        <button id="add-token" class="dm-only">+ Token</button>
-        <button id="add-portrait" class="dm-only" title="Add a token with a portrait image">+ 📷</button>
-        <button id="grid-toggle" class="btn-secondary dm-only" title="Overlay a grid (for maps without one)">⊞ Grid</button>
-        <button id="grid-minus" class="btn-secondary dm-only" title="Smaller grid squares">−</button>
-        <button id="grid-plus" class="btn-secondary dm-only" title="Larger grid squares">+</button>
+        <!-- 🗺 Map -->
+        <div class="menu dm-only">
+          <button class="menu-trigger btn-secondary" type="button" data-tip="Set the battle map, save maps, rotate, and the grid">🗺 Map ▾</button>
+          <div class="menu-panel">
+            <div class="menu-label">Saved maps</div>
+            <div class="menu-row">
+              <select id="map-picker" title="Saved maps (shared library)"><option value="">— saved maps —</option></select>
+              <button id="map-remove" class="btn-secondary" title="Remove the selected saved map from the library">🗑</button>
+            </div>
+            <div class="menu-label">Set a map</div>
+            <input id="map-url" placeholder="Paste a map image URL…" />
+            <div class="menu-row">
+              <button id="map-set">Set map</button>
+              <button id="map-save" class="btn-secondary" title="Save this map URL to the library">★ Save</button>
+              <button id="map-upload" class="btn-secondary" title="Upload a map image from your computer">⬆ Upload</button>
+              <button id="map-rotate" class="btn-secondary" title="Rotate the map 90°">⟳ Rotate</button>
+            </div>
+            <div class="menu-label">Grid</div>
+            <div class="menu-row">
+              <button id="grid-toggle" class="btn-secondary" title="Overlay a grid (for maps without one)">⊞ Grid</button>
+              <button id="grid-minus" class="btn-secondary" title="Smaller grid squares">−</button>
+              <button id="grid-plus" class="btn-secondary" title="Larger grid squares">+</button>
+            </div>
+          </div>
+        </div>
+        <!-- 🧩 Tokens -->
+        <div class="menu dm-only">
+          <button class="menu-trigger btn-secondary" type="button" data-tip="Add tokens (figures) to the map">🧩 Tokens ▾</button>
+          <div class="menu-panel">
+            <div class="menu-row">
+              <button id="add-token">+ Token</button>
+              <button id="add-portrait" title="Add a token with a portrait image">+ 📷 Portrait</button>
+            </div>
+          </div>
+        </div>
+        <!-- 🌫 Fog -->
+        <div class="menu dm-only">
+          <button class="menu-trigger btn-secondary" type="button" data-tip="Hide the map and reveal areas as players explore">🌫 Fog ▾</button>
+          <div class="menu-panel">
+            <div class="menu-row">
+              <button id="fog-toggle" class="btn-secondary" title="Turn fog of war on/off">🌫 Fog on/off</button>
+              <button id="fog-reveal" class="btn-secondary" title="Paint to reveal areas (drag on the map)">Reveal</button>
+              <button id="fog-reset" class="btn-secondary" title="Hide the whole map again">Reset fog</button>
+            </div>
+          </div>
+        </div>
+        <!-- 🎨 Draw & weather -->
+        <div class="menu dm-only">
+          <button class="menu-trigger btn-secondary" type="button" data-tip="Draw on the map, place spell templates, and set weather">🎨 Draw ▾</button>
+          <div class="menu-panel">
+            <div class="menu-row">
+              <button id="draw-toggle" class="btn-secondary" title="Freehand draw on the map">✏️ Draw</button>
+              <button id="tpl-toggle" class="btn-secondary" title="Place a spell template">🔺 Template</button>
+            </div>
+            <div class="menu-row">
+              <select id="tpl-shape" title="Template shape"><option value="circle">Circle</option><option value="cone">Cone</option></select>
+              <input id="tpl-ft" type="number" value="20" title="Template size (ft)" style="width:64px" />
+              <button id="anno-clear" class="btn-secondary" title="Clear drawings, templates, walls &amp; lights">🧹 Clear</button>
+            </div>
+            <div class="menu-label">Weather</div>
+            <select id="weather-select" title="Weather">
+              <option value="none">☀ Clear</option><option value="rain">🌧 Rain</option><option value="snow">❄ Snow</option><option value="fog">🌫 Mist</option>
+            </select>
+          </div>
+        </div>
+        <!-- 💡 Lighting -->
+        <div class="menu dm-only">
+          <button class="menu-trigger btn-secondary" type="button" data-tip="Walls and light sources for dynamic lighting / line-of-sight">💡 Lighting ▾</button>
+          <div class="menu-panel">
+            <div class="menu-row">
+              <button id="wall-toggle" class="btn-secondary" title="Draw light-blocking walls (drag)">🧱 Walls</button>
+              <button id="light-toggle" class="btn-secondary" title="Place a light source (click)">💡 Light</button>
+              <input id="light-ft" type="number" value="40" title="Light radius (ft)" style="width:64px" />
+            </div>
+            <button id="lighting-toggle" class="btn-secondary" title="Toggle dynamic lighting / line-of-sight">🌑 Lighting on/off</button>
+          </div>
+        </div>
+        <!-- 🎭 Table -->
+        <div class="menu dm-only">
+          <button class="menu-trigger btn-secondary" type="button" data-tip="Manage who can join, and show handouts to players">🎭 Table ▾</button>
+          <div class="menu-panel">
+            <div class="menu-row">
+              <button id="players-btn" class="btn-secondary" title="Manage who can join this table">👥 Players</button>
+              <button id="handout-btn" class="btn-secondary" title="Show an image to all players">🖼 Show handout</button>
+            </div>
+          </div>
+        </div>
+        <!-- View tools (everyone) -->
         <button id="snap-toggle" class="btn-secondary" title="Snap tokens to the grid when you drop them">▦ Snap</button>
         <button id="measure-toggle" class="btn-secondary" title="Measure distance: drag on the map (ft / squares)">📏 Measure</button>
         <button id="view-reset" class="btn-secondary" title="Reset zoom &amp; pan">⟲ View</button>
-        <button id="fog-toggle" class="btn-secondary dm-only" title="Turn fog of war on/off">🌫 Fog</button>
-        <button id="fog-reveal" class="btn-secondary dm-only" title="Paint to reveal areas (drag on the map)">Reveal</button>
-        <button id="fog-reset" class="btn-secondary dm-only" title="Hide the whole map again">Reset fog</button>
-        <button id="draw-toggle" class="btn-secondary dm-only" title="Freehand draw on the map">✏️ Draw</button>
-        <button id="tpl-toggle" class="btn-secondary dm-only" title="Place a spell template">🔺 Template</button>
-        <select id="tpl-shape" class="dm-only" title="Template shape"><option value="circle">Circle</option><option value="cone">Cone</option></select>
-        <input id="tpl-ft" class="dm-only" type="number" value="20" title="Template size (ft)" style="width:54px" />
-        <button id="wall-toggle" class="btn-secondary dm-only" title="Draw light-blocking walls (drag)">🧱 Walls</button>
-        <button id="light-toggle" class="btn-secondary dm-only" title="Place a light source (click)">💡 Light</button>
-        <input id="light-ft" class="dm-only" type="number" value="40" title="Light radius (ft)" style="width:54px" />
-        <button id="lighting-toggle" class="btn-secondary dm-only" title="Toggle dynamic lighting / line-of-sight">🌑 Lighting</button>
-        <button id="anno-clear" class="btn-secondary dm-only" title="Clear drawings, templates, walls &amp; lights">🧹</button>
-        <select id="weather-select" class="dm-only" title="Weather">
-          <option value="none">☀ Clear</option><option value="rain">🌧 Rain</option><option value="snow">❄ Snow</option><option value="fog">🌫 Mist</option>
-        </select>
+
+        <span class="topbar-spacer"></span>
+        <button id="mute-btn" class="btn-secondary" title="Mute sounds">🔊</button>
+        <button id="help-btn" class="btn-secondary" title="Help &amp; guide">❔ Help</button>
+        <button id="logout-btn" class="btn-secondary" title="Log out">⎋ Log out</button>
+
+        <input type="file" id="handout-file" accept="image/*" hidden />
         <input type="file" id="map-file" accept="image/*" hidden />
         <input type="file" id="portrait-file" accept="image/*" hidden />
         <span class="voice-controls">
@@ -187,15 +251,15 @@
 
       <aside class="sidebar">
         <nav class="tabs">
-          <button class="tab active" data-tab="chat">Chat</button>
-          <button class="tab" data-tab="sheets">PCs</button>
-          <button class="tab" data-tab="init">Initiative</button>
-          <button class="tab" data-tab="bestiary">Bestiary</button>
-          <button class="tab" data-tab="refs">Refs</button>
-          <button class="tab dm-only" data-tab="fx">FX</button>
-          <button class="tab" data-tab="ai">✨ AI</button>
-          <button class="tab" data-tab="journal">📖 Journal</button>
-          <button class="tab" data-tab="loot">💰 Loot</button>
+          <button class="tab active" data-tab="chat" data-tip="Messages and dice-roll results">Chat</button>
+          <button class="tab" data-tab="sheets" data-tip="Player character sheets">PCs</button>
+          <button class="tab" data-tab="init" data-tip="Initiative tracker — combat turn order">Initiative</button>
+          <button class="tab" data-tab="bestiary" data-tip="Monster & NPC stat blocks; drag onto the map">Bestiary</button>
+          <button class="tab" data-tab="refs" data-tip="Look up spells & magic items">Refs</button>
+          <button class="tab dm-only" data-tab="fx" data-tip="Lighting effects, soundboard & Hue helper (DM)">FX</button>
+          <button class="tab" data-tab="ai" data-tip="AI assistant for characters, monsters & rules">✨ AI</button>
+          <button class="tab" data-tab="journal" data-tip="Session notes & lore">📖 Journal</button>
+          <button class="tab" data-tab="loot" data-tip="Party loot & gold tracker">💰 Loot</button>
         </nav>
 
         <!-- Chat + dice -->

@@ -11,7 +11,7 @@ const SECTIONS = [
         <li><b>Create an account</b> and log in. Everyone starts as a <b>Player</b>.</li>
         <li>To run games, ask an admin for <b>Game Master</b> access (see Accounts &amp; roles).</li>
         <li>From the dashboard, <b>join a table</b> a friend shared, or <b>create</b> one if you're a GM.</li>
-        <li>Inside a table you'll see the <b>map</b> in the middle, a <b>top toolbar</b>, the <b>dice bar</b> at the bottom-left, and the <b>sidebar tabs</b> on the right.</li>
+        <li>Inside a table you'll see the <b>map</b> in the middle, a <b>top toolbar</b>, the <b>dice bar</b> below the chat (lower-right), and the <b>sidebar tabs</b> on the right.</li>
       </ul>
       <p>Tip: hover almost any button in the app and a little tooltip tells you what it does.</p>` },
 
@@ -33,7 +33,8 @@ const SECTIONS = [
         <li><b>Your tables</b> — every game you own or have joined. Click one to jump straight in.</li>
         <li><b>Join a new table</b> — enter a table name and its invite password (ask your GM). After the first join it appears in "Your tables".</li>
         <li><b>Create a table</b> (GMs) — name it and optionally set an invite password to share with players.</li>
-        <li><b>⚙ Settings</b>, <b>Request GM access</b>, <b>Manage accounts</b> (admin), <b>Manage rooms</b> (owner) and <b>Log out</b> live here too.</li>
+        <li><b>Delete a table</b> — on a table you own, click the 🗑 on its row in "Your tables" to remove it and all its data.</li>
+        <li><b>⚙ Settings</b>, <b>Request GM access</b>, <b>Manage accounts</b> / <b>Manage all tables</b> (admin), and <b>Log out</b> live here too.</li>
       </ul>` },
 
   {
@@ -57,17 +58,17 @@ const SECTIONS = [
       </ul>` },
 
   {
-    id: "mapctl", title: "DM map controls (top toolbar)", dm: true, body: `
-      <p>Game Masters get a row of map tools in the top bar:</p>
+    id: "mapctl", title: "DM map controls (top-bar menus)", dm: true, body: `
+      <p>Game Master tools are grouped into labeled dropdown menus in the top bar — click one to open it. Only one opens at a time; click a button to use it, or click away / press Esc to close.</p>
       <ul>
-        <li><b>— saved maps —</b> dropdown + <b>🗑</b> — pick or remove a map from your shared library.</li>
-        <li><b>Map URL + Set map</b> — display a map from a web link. <b>⬆ Map</b> uploads one from your computer.</li>
-        <li><b>★</b> — save the current map URL to your library for reuse.</li>
-        <li><b>⟳</b> — rotate the map 90°.</li>
-        <li><b>⊞ Grid</b> with <b>−</b>/<b>+</b> — overlay an adjustable grid for maps that don't have one.</li>
-        <li><b>▦ Snap</b> — snap tokens to the grid (available to everyone).</li>
-        <li><b>📏 Measure</b> — drag on the map to measure distance in feet/squares.</li>
-      </ul>` },
+        <li><b>🗺 Map</b> — pick or remove a saved map; paste a map URL and <b>Set map</b>; <b>★ Save</b> to your library; <b>⬆ Upload</b> from your computer; <b>⟳ Rotate</b>; and the <b>⊞ Grid</b> toggle with <b>−</b>/<b>+</b> sizing.</li>
+        <li><b>🧩 Tokens</b> — add a token, or one with a portrait image.</li>
+        <li><b>🌫 Fog</b> — fog on/off, Reveal, Reset fog.</li>
+        <li><b>🎨 Draw</b> — freehand draw, spell templates (shape + size), clear, and weather.</li>
+        <li><b>💡 Lighting</b> — walls, light sources (radius), and the lighting toggle.</li>
+        <li><b>🎭 Table</b> — manage players and show a handout.</li>
+      </ul>
+      <p>Always-visible (for everyone): <b>▦ Snap</b>, <b>📏 Measure</b>, and <b>⟲ View</b> (reset zoom/pan).</p>` },
 
   {
     id: "fog", title: "Fog of war", dm: true, body: `
@@ -110,7 +111,7 @@ const SECTIONS = [
 
   {
     id: "dice", title: "Rolling dice", body: `
-      <p>The <b>dice bar</b> sits at the bottom-left. Click a die (d20, d12, d10, d8, d6, d4) to roll it — the result drops into chat and animates on screen.</p>
+      <p>The <b>dice bar</b> sits just below the chat (lower-right). Click a die (d20, d12, d10, d8, d6, d4) to roll it — the result drops into chat and animates on screen.</p>
       <ul>
         <li><b>Advantage / Disadvantage</b> — toggle these before rolling to roll twice and keep the higher/lower.</li>
         <li><b>Secret</b> — a secret roll is shown only to you and the DM.</li>
@@ -193,10 +194,11 @@ const SECTIONS = [
       </ul>` },
 
   {
-    id: "admin", title: "Admin & room management", dm: true, body: `
+    id: "admin", title: "Admin", dm: true, body: `
       <ul>
-        <li><b>Manage accounts</b> (admin) — see all accounts, change roles, reset passwords, and approve Game Master requests.</li>
-        <li><b>Manage rooms</b> (table owner) — review and delete tables you own.</li>
+        <li><b>Manage accounts</b> (admin) — see all accounts, change roles (Player / Game Master / Admin), reset passwords, and approve Game Master requests.</li>
+        <li><b>Manage all tables</b> (admin) — view every table with its owner and delete any of them.</li>
+        <li><b>Owner account</b> — the first account created is the owner. Other admins can manage everyone else but can't change, reset, or delete the owner's account.</li>
       </ul>` },
 ];
 

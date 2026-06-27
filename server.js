@@ -498,11 +498,18 @@ io.on("connection", (socket) => {
   // --- Account management (system admin role) ------------------------------
   const isAdmin = () => socket.user && socket.user.role === "admin";
   const adminCount = () => store.listUsers().filter((u) => u.role === "admin").length;
-  const userListPayload = () => store.listUsers().map((u) => ({
-    id: u.id, username: u.username, name: u.name, email: u.email, role: u.role,
-    gm_requested: u.gm_requested, created_at: u.created_at,
-    tables: store.getUserTables(u.id, u.email),
-  }));
+  // The very first account created is the "owner" (super-admin). Other admins
+  // can manage everyone else, but cannot touch the owner's account.
+  const superAdminId = () => { const us = store.listUsers(); return us.length ? us[0].id : null; };
+  const amSuper = () => socket.user && socket.user.id === superAdminId();
+  const userListPayload = () => {
+    const sid = superAdminId();
+    return store.listUsers().map((u) => ({
+      id: u.id, username: u.username, name: u.name, email: u.email, role: u.role,
+      gm_requested: u.gm_requested, created_at: u.created_at, is_super: u.id === sid,
+      tables: store.getUserTables(u.id, u.email),
+    }));
+  };
   socket.on("adminUsers", () => {
     if (!isAdmin()) return socket.emit("adminError", "Admins only.");
     socket.emit("adminUserList", userListPayload());
@@ -511,6 +518,8 @@ io.on("connection", (socket) => {
     if (!isAdmin() || !["player", "gm", "admin"].includes(role)) return;
     const target = store.getUserById(id);
     if (!target) return;
+    if (id === superAdminId() && !amSuper())
+      return socket.emit("adminError", "Only the owner can change the owner's account.");
     if (target.role === "admin" && role !== "admin" && adminCount() <= 1)
       return socket.emit("adminError", "Can't remove the last admin.");
     store.setUserRole(id, role);
@@ -524,6 +533,8 @@ io.on("connection", (socket) => {
   });
   socket.on("adminResetPassword", ({ id, newPassword }) => {
     if (!isAdmin()) return;
+    if (id === superAdminId() && !amSuper())
+      return socket.emit("adminError", "Only the owner can reset the owner's password.");
     if (!newPassword || String(newPassword).length < 6) return socket.emit("adminError", "New password must be at least 6 characters.");
     if (!store.getUserById(id)) return;
     store.setUserPassword(id, bcrypt.hashSync(String(newPassword), 10));
@@ -532,6 +543,7 @@ io.on("connection", (socket) => {
   socket.on("adminDeleteUser", (id) => {
     if (!isAdmin()) return;
     if (id === socket.user.id) return socket.emit("adminError", "You can't delete your own account here.");
+    if (id === superAdminId()) return socket.emit("adminError", "The owner account can't be deleted.");
     const target = store.getUserById(id);
     if (!target) return;
     if (target.role === "admin" && adminCount() <= 1)
@@ -552,13 +564,38 @@ io.on("connection", (socket) => {
   });
   socket.on("adminDelete", ({ password, room }) => {
     if (!checkAdmin(password)) return socket.emit("adminError", "Wrong admin password.");
-    store.deleteRoom(room);
-    // Drop any in-memory state for the deleted room and notify anyone still in it.
-    initiatives.delete(room);
-    fogRooms.delete(room);
-    voiceRooms.delete(room);
-    io.to(room).emit("chat", sys("This room was deleted by the owner."));
+    purgeRoom(room);
     socket.emit("adminRooms", store.listRooms());
+  });
+
+  // --- Role-based table management (no password) ---------------------------
+  // Drop a table and all its in-memory state, and tell anyone still inside.
+  function purgeRoom(room) {
+    store.deleteRoom(room);
+    initiatives.delete(room); fogRooms.delete(room); voiceRooms.delete(room);
+    annotations.delete(room); timers.delete(room);
+    io.to(room).emit("chat", sys("This table was deleted."));
+  }
+  function allTablesPayload() {
+    const byId = Object.fromEntries(store.listUsers().map((u) => [u.id, u]));
+    return store.listRooms().map((r) => ({ ...r, owner: r.owner_id ? (byId[r.owner_id]?.username || "—") : "—" }));
+  }
+  // A GM deletes a table they own; an admin can delete any table.
+  socket.on("deleteTable", (room) => {
+    if (!socket.user) return;
+    const rid = String(room || "").trim().toLowerCase();
+    const r = store.getRoom(rid);
+    if (!r) return;
+    const owner = r.owner_id === socket.user.id;
+    if (!owner && !isAdmin()) return socket.emit("adminError", "Only the table's owner or an admin can delete it.");
+    purgeRoom(rid);
+    socket.emit("myTablesList", store.getUserTables(socket.user.id, socket.user.email));
+    if (isAdmin()) socket.emit("adminTableList", allTablesPayload());
+  });
+  // Admin-only: list every table (with its owner) for the admin tables panel.
+  socket.on("adminTables", () => {
+    if (!isAdmin()) return socket.emit("adminError", "Admins only.");
+    socket.emit("adminTableList", allTablesPayload());
   });
 
   // --- Map (DM only) -------------------------------------------------------
