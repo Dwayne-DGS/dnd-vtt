@@ -48,7 +48,7 @@ const pubUser = (u) => {
   if (!u) return null;
   let macros = [];
   try { macros = JSON.parse(u.macros || "[]"); } catch {}
-  return { username: u.username, role: u.role, name: u.name || null, gmRequested: !!u.gm_requested, diceSkin: u.dice_skin || "galaxy", macros };
+  return { username: u.username, role: u.role, name: u.name || null, gmRequested: !!u.gm_requested, diceSkin: u.dice_skin || "galaxy", dice3d: u.dice3d == null ? 1 : u.dice3d, macros };
 };
 
 app.post("/auth/signup", (req, res) => {
@@ -144,6 +144,11 @@ const voiceRooms = new Map(); // roomId -> Set<socketId>
 // Ephemeral map annotations per room: freehand drawings, area templates, weather.
 const annotations = new Map(); // roomId -> { drawings:[], templates:[], weather:"none" }
 const timers = new Map(); // roomId -> { running, endsAt, duration, label }
+const hueHelpers = new Map(); // socket.id -> { room, url } (connected Hue helpers)
+function hueStatusFor(room) {
+  for (const h of hueHelpers.values()) if (h.room === room) return { connected: true, url: h.url || "" };
+  return { connected: false, url: "" };
+}
 function getTimer(roomId) {
   if (!timers.has(roomId)) timers.set(roomId, { running: false, endsAt: 0, duration: 60, label: "" });
   return timers.get(roomId);
@@ -291,6 +296,11 @@ io.on("connection", (socket) => {
     if (!socket.user || typeof skin !== "string" || skin.length > 20) return;
     store.setDiceSkin(socket.user.id, skin);
   });
+  // Toggle the 3D dice preference on the account.
+  socket.on("setDice3d", (on) => {
+    if (!socket.user) return;
+    store.setDice3d(socket.user.id, on ? 1 : 0);
+  });
   // Save the player's dice macros to their account.
   socket.on("setMacros", (macros) => {
     if (!socket.user || !Array.isArray(macros)) return;
@@ -426,10 +436,19 @@ io.on("connection", (socket) => {
   // The DM fires an effect; it's broadcast to the room. Browsers flash the
   // screen, and any connected Hue helper drives the lights. The helper joins a
   // room purely to listen (no password needed — it can only receive).
-  socket.on("hueSubscribe", (room) => {
+  socket.on("hueSubscribe", (payload) => {
+    // Backward compatible: older helpers send a plain room string; newer ones
+    // send { room, url } so the DM panel can link to the helper's setup page.
+    const room = typeof payload === "string" ? payload : (payload && payload.room);
+    const url = (payload && typeof payload === "object" && payload.url) || "";
     const r = (room || "").trim().toLowerCase();
-    if (r) socket.join(r);
+    if (!r) return;
+    socket.join(r);
+    hueHelpers.set(socket.id, { room: r, url: String(url).slice(0, 200) });
+    io.to(r).emit("hueStatus", hueStatusFor(r));
   });
+  // The DM panel asks for the current helper status for its room.
+  socket.on("hueStatus", () => { if (roomId) socket.emit("hueStatus", hueStatusFor(roomId)); });
   socket.on("castEffect", (effect) => {
     if (!roomId || !amDM() || !effect) return;
     io.to(roomId).emit("spellEffect", String(effect));
@@ -658,10 +677,11 @@ io.on("connection", (socket) => {
         type: "roll", who,
         text: `rolled ${a.notation} with ${adv ? "advantage" : "disadvantage"} = ${keep.total}`,
         detail: `kept ${keep.total} of [${a.total}, ${b.total}]`,
+        dice: keep.dice,
         ts: Date.now(),
       };
     } else {
-      payload = { type: "roll", who, text: `rolled ${a.notation} = ${a.total}`, detail: a.breakdown, ts: Date.now() };
+      payload = { type: "roll", who, text: `rolled ${a.notation} = ${a.total}`, detail: a.breakdown, dice: a.dice, ts: Date.now() };
     }
 
     if (opts.secret) {
@@ -824,6 +844,8 @@ io.on("connection", (socket) => {
     }
     names.delete(socket.id);
     dmFlags.delete(socket.id);
+    const helper = hueHelpers.get(socket.id);
+    if (helper) { hueHelpers.delete(socket.id); io.to(helper.room).emit("hueStatus", hueStatusFor(helper.room)); }
   });
 });
 

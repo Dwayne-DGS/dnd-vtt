@@ -444,3 +444,18 @@ body.is-player .dm-only { display: none !important; }
 .timer-ctrl { display: flex; align-items: center; gap: 5px; }
 .timer-ctrl input { padding: 3px 6px; font-size: 12px; }
 .timer-ctrl button { padding: 3px 9px; }
+
+/* 3D dice overlay */
+.dice3d { position: fixed; inset: 0; z-index: 60; pointer-events: none; transition: opacity 0.4s ease; }
+.dice3d.hidden { display: none; }
+.dice3d canvas { width: 100%; height: 100%; display: block; }
+.set-toggle { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--ink); margin: 4px 0 14px; line-height: 1.4; cursor: pointer; }
+.set-toggle input { margin-top: 2px; }
+
+/* Hue helper locator (FX tab) */
+.hue-status { font-size: 13px; margin: 4px 0 8px; }
+.hue-status.ok { color: #7fd99a; }
+.hue-status.off { color: #d99a7f; }
+.hue-locate { display: flex; gap: 6px; align-items: center; }
+.hue-locate input { flex: 1; }
+#hue-open { text-decoration: none; white-space: nowrap; }

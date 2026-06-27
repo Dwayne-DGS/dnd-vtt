@@ -79,6 +79,8 @@
       <h3 class="dash-h">Your dice</h3>
       <p class="join-hint">Pick a dice style. It's saved to your account and used wherever you roll.</p>
       <div id="skin-grid" class="skin-grid"></div>
+      <h3 class="dash-h">Roll animation</h3>
+      <label class="set-toggle"><input type="checkbox" id="set-dice3d" checked /> 3D physics dice (tumbling). Uncheck for the lighter 2D animation.</label>
       <button id="settings-close" class="btn-secondary">Close</button>
     </div>
   </div>
@@ -250,6 +252,13 @@
         <div id="tab-fx" class="tab-panel">
           <p class="join-hint">Fire a lighting effect — flashes everyone's screen, and your Philips Hue lights if the helper is running.</p>
           <div id="fx-buttons" class="fx-buttons"></div>
+          <h3 class="dash-h" style="margin-top:16px">Philips Hue helper</h3>
+          <div id="hue-status" class="hue-status">Checking…</div>
+          <div class="hue-locate">
+            <input id="hue-url" placeholder="e.g. http://192.168.1.50:8765" />
+            <a id="hue-open" class="btn-secondary" target="_blank" rel="noopener">Open setup ↗</a>
+          </div>
+          <p class="join-hint">The helper reports its address automatically when it connects. You can override it here if needed (saved in this browser).</p>
           <h3 class="dash-h" style="margin-top:16px">Soundboard</h3>
           <p class="join-hint">Add ambient loops or sound effects (upload a file or paste a URL), then play them for the whole table.</p>
           <div class="snd-add">
@@ -352,6 +361,7 @@
   </div>
 
   <div id="fx-flash" class="fx-flash"></div>
+  <div id="dice3d" class="dice3d hidden"></div>
   <div id="dice-anim" class="dice-anim hidden"></div>
   <div id="handout-overlay" class="handout-overlay hidden">
     <div class="handout-inner">

@@ -16,6 +16,7 @@ import { initWeather } from "./weather.js";
 import { initJournal } from "./journal.js";
 import { initLoot } from "./loot.js";
 import { initTimer } from "./timer.js";
+import { initDice3d, setDice3dEnabled } from "./dice3d.js";
 
 const socket = io({ autoConnect: false });
 
@@ -72,6 +73,16 @@ function openSettings() {
     });
     skinGrid.appendChild(card);
   });
+  const d3 = document.getElementById("set-dice3d");
+  if (d3) {
+    d3.checked = !(window.account && window.account.dice3d === 0);
+    d3.onchange = () => {
+      setDice3dEnabled(d3.checked);
+      if (window.account) window.account.dice3d = d3.checked ? 1 : 0;
+      socket.connect();
+      socket.emit("setDice3d", d3.checked);
+    };
+  }
   settingsOverlay.classList.remove("hidden");
 }
 
@@ -333,6 +344,7 @@ function enterApp(room) {
   initJournal(socket);
   initLoot(socket);
   initTimer(socket);
+  initDice3d(socket);
 
   // Handouts — DM shows an image to everyone.
   const handoutOverlay = document.getElementById("handout-overlay");

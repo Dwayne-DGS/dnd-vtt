@@ -1,0 +1,26 @@
+# Reference systemd unit for the D&D VTT Hue helper.
+# You normally don't edit this by hand — run ./install-service.sh, which
+# generates this file with the correct paths/user for your machine.
+# Shown here so you can see exactly what gets installed.
+#
+# Manual install (if you prefer):
+#   sudo cp dnd-hue-helper.service /etc/systemd/system/
+#   # edit User=, WorkingDirectory= and ExecStart= paths to match your setup
+#   sudo systemctl daemon-reload && sudo systemctl enable --now dnd-hue-helper
+
+[Unit]
+Description=D&D VTT Philips Hue helper
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/dnd-vtt/hue-helper
+ExecStart=/usr/bin/node /home/pi/dnd-vtt/hue-helper/hue-helper.js
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

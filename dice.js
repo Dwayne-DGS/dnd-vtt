@@ -12,6 +12,7 @@ export function rollDice(notation) {
 
   let total = 0;
   const parts = [];
+  const dice = []; // structured per-die results for 3D rendering: { sides, value }
 
   for (const term of terms) {
     const sign = term.startsWith("-") ? -1 : 1;
@@ -29,6 +30,7 @@ export function rollDice(notation) {
         const r = 1 + Math.floor(Math.random() * sides);
         rolls.push(r);
         total += sign * r;
+        dice.push({ sides, value: r });
       }
       parts.push(`${sign < 0 ? "-" : ""}${count}d${sides}[${rolls.join(",")}]`);
     } else if (/^\d+$/.test(body)) {
@@ -40,5 +42,5 @@ export function rollDice(notation) {
     }
   }
 
-  return { total, breakdown: parts.join(" "), notation: clean };
+  return { total, breakdown: parts.join(" "), notation: clean, dice };
 }

@@ -34,4 +34,36 @@ export function initFX(socket) {
     flash.style.opacity = "0.5";
     setTimeout(() => { flash.style.opacity = "0"; }, 350);
   });
+
+  // --- Hue helper locator + status ----------------------------------------
+  const statusEl = document.getElementById("hue-status");
+  const urlInput = document.getElementById("hue-url");
+  const openLink = document.getElementById("hue-open");
+  let reportedUrl = "";
+
+  const manualUrl = () => (localStorage.getItem("hueUrl") || "").trim();
+  const effectiveUrl = () => manualUrl() || reportedUrl || "";
+  function refreshLink() {
+    const u = effectiveUrl();
+    if (u) { openLink.href = u; openLink.style.display = ""; }
+    else { openLink.removeAttribute("href"); openLink.style.display = "none"; }
+  }
+  if (urlInput) {
+    urlInput.value = manualUrl();
+    urlInput.addEventListener("change", () => {
+      const v = urlInput.value.trim();
+      if (v) localStorage.setItem("hueUrl", v); else localStorage.removeItem("hueUrl");
+      refreshLink();
+    });
+  }
+  socket.on("hueStatus", ({ connected, url } = {}) => {
+    reportedUrl = url || reportedUrl;
+    if (statusEl) {
+      statusEl.textContent = connected ? "● Connected" : "○ Not connected — start the helper on your Pi";
+      statusEl.className = "hue-status " + (connected ? "ok" : "off");
+    }
+    refreshLink();
+  });
+  refreshLink();
+  socket.emit("hueStatus");
 }

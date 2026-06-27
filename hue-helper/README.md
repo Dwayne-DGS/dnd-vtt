@@ -40,9 +40,38 @@ Once it's set up and connected, whenever the DM clicks an effect in the game (th
 
 ## Moving to a Raspberry Pi later
 
-Copy the `hue-helper` folder to the Pi, run `npm install` and `npm start`, and open
-`http://<pi-ip>:8765` from any device on your network to set it up. Use something
-like `pm2` to keep it running on boot (same as the game server).
+Copy the `hue-helper` folder to the Pi, run `npm install`, and open
+`http://<pi-ip>:8765` from any device on your network to set it up.
+
+### Start automatically on boot (recommended for the Pi)
+
+Run the included installer once — it sets up a systemd service that starts the
+helper on every reboot and restarts it if it ever crashes:
+
+```bash
+cd ~/dnd-vtt/hue-helper
+./install-service.sh
+```
+
+It auto-detects the folder, your username, and the `node` path. Handy commands
+afterward:
+
+```bash
+sudo systemctl status dnd-hue-helper     # is it running?
+journalctl -u dnd-hue-helper -f          # watch logs live
+sudo systemctl restart dnd-hue-helper    # after pulling changes
+sudo systemctl disable --now dnd-hue-helper  # turn auto-start off
+```
+
+(`dnd-hue-helper.service` in this folder is a reference copy of what gets installed.)
+
+### Finding the helper from the game
+
+When the helper connects it tells the server its own address, so the DM can see
+its status and jump to this setup page right from the **FX** tab in the game
+("Philips Hue helper → Open setup"). If the auto-detected address isn't reachable
+by name, type the Pi's address (e.g. `http://192.168.1.50:8765`) into the field
+there — it's saved in your browser.
 
 ## Effects
 

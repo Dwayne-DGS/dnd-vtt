@@ -15,6 +15,17 @@ import { io } from "socket.io-client";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import os from "os";
+
+// Best-guess LAN address so the VTT's DM panel can link to this setup page.
+function localUiUrl() {
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const i of list || []) {
+      if (i.family === "IPv4" && !i.internal) return `http://${i.address}:${UI_PORT}`;
+    }
+  }
+  return `http://localhost:${UI_PORT}`;
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONFIG_FILE = join(__dirname, "config.json");
@@ -163,7 +174,7 @@ function connectServer() {
   if (socket) { socket.removeAllListeners(); socket.close(); }
   if (!config.serverUrl || !config.room) return;
   socket = io(config.serverUrl, { transports: ["websocket", "polling"] });
-  socket.on("connect", () => { serverConnected = true; socket.emit("hueSubscribe", config.room); console.log("Connected to game server, listening in room:", config.room); });
+  socket.on("connect", () => { serverConnected = true; socket.emit("hueSubscribe", { room: config.room, url: config.uiUrl || localUiUrl() }); console.log("Connected to game server, listening in room:", config.room); });
   socket.on("disconnect", () => { serverConnected = false; });
   socket.on("spellEffect", (id) => { console.log("Effect:", id); applyEffect(id); });
 }

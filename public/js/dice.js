@@ -68,7 +68,7 @@ function renderBar(socket) {
     const b = document.createElement("button");
     b.className = "die-btn"; b.title = `Roll a ${type}`;
     b.innerHTML = buildDie(type, sides, "die-svg");
-    b.addEventListener("click", () => { socket.emit("roll", type, window.rollOpts || {}); startAnim(type); });
+    b.addEventListener("click", () => { socket.emit("roll", type, window.rollOpts || {}); if (!window.dice3dActive) startAnim(type); });
     barEl.appendChild(b);
   });
 }
