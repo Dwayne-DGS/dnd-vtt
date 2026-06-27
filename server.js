@@ -44,22 +44,26 @@ function setSessionCookie(res, token) {
   res.setHeader("Set-Cookie", `vtt_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`);
 }
 function userFromReq(req) { return store.getSessionUser(parseCookies(req.headers.cookie)["vtt_session"]); }
-const pubUser = (u) => (u ? { username: u.username, role: u.role } : null);
+const pubUser = (u) => (u ? { username: u.username, role: u.role, name: u.name || null, gmRequested: !!u.gm_requested } : null);
 
 app.post("/auth/signup", (req, res) => {
   const username = String(req.body.username || "").trim().toLowerCase();
   const password = String(req.body.password || "");
-  const role = req.body.role === "gm" ? "gm" : "player";
+  const name = String(req.body.name || "").trim();
+  const email = String(req.body.email || "").trim().toLowerCase();
   if (!/^[a-z0-9_]{3,20}$/.test(username)) return res.status(400).json({ error: "Username: 3–20 letters, numbers, or underscores." });
   if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters." });
+  if (!name) return res.status(400).json({ error: "Please enter your name." });
+  if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: "Please enter a valid email." });
   if (store.getUserByUsername(username)) return res.status(409).json({ error: "That username is taken." });
-  const finalRole = store.countUsers() === 0 ? "admin" : role; // first account = system admin
+  // Everyone signs up as a player; an admin promotes to GM. First account = admin.
+  const finalRole = store.countUsers() === 0 ? "admin" : "player";
   const id = randomUUID();
-  store.createUser({ id, username, pass_hash: bcrypt.hashSync(password, 10), role: finalRole });
+  store.createUser({ id, username, name, email, pass_hash: bcrypt.hashSync(password, 10), role: finalRole });
   const token = randomBytes(32).toString("hex");
   store.createSession(token, id);
   setSessionCookie(res, token);
-  res.json({ user: { username, role: finalRole } });
+  res.json({ user: { username, role: finalRole, name } });
 });
 
 app.post("/auth/login", (req, res) => {
@@ -191,62 +195,97 @@ io.on("connection", (socket) => {
     });
   }
 
-  // Create a brand-new table: the DM names it and sets both passwords. The
-  // creator becomes the DM. Fails if the room name is already taken.
-  socket.on("createRoom", ({ room, name, dmPassword, playerPassword }) => {
+  function enterRoom(isDM) {
+    const pname = socket.user.username;
+    names.set(socket.id, pname);
+    dmFlags.set(socket.id, isDM);
+    socket.join(roomId);
+    store.touchRoom(roomId);
+    store.addMember(roomId, socket.user.id);
+    socket.emit("role", { isDM, name: pname, room: roomId });
+    sendState();
+    io.to(roomId).emit("chat", sys(`${pname} joined${isDM ? " (DM)" : ""}`));
+  }
+
+  // A GM/admin creates a table — they become its owner and DM. Optional invite
+  // password lets players join the first time.
+  socket.on("createRoom", ({ room, playerPassword }) => {
     if (!socket.user) return socket.emit("joinError", "Please log in first.");
     if (!["gm", "admin"].includes(socket.user.role)) {
       return socket.emit("joinError", "Only Game Master accounts can create tables.");
     }
     roomId = (room || "").trim().toLowerCase();
-    const pname = socket.user.username;
-    const dpw = (dmPassword || "").trim();
-    if (!roomId) return socket.emit("joinError", "Please enter a room name.");
-    if (!dpw) return socket.emit("joinError", "A DM password is required to create a room.");
+    if (!roomId) return socket.emit("joinError", "Please enter a table name.");
     const existing = store.getRoom(roomId);
-    if (existing && existing.dm_password) {
-      return socket.emit("joinError", "That room name is already taken — use Join instead.");
+    if (existing && existing.owner_id && existing.owner_id !== socket.user.id) {
+      return socket.emit("joinError", "That table name is already taken.");
     }
     store.ensureRoom(roomId);
-    store.setDmPassword(roomId, dpw);
+    store.setRoomOwner(roomId, socket.user.id);
     store.setPlayerPassword(roomId, (playerPassword || "").trim() || null);
-    store.touchRoom(roomId);
-    names.set(socket.id, pname);
-    dmFlags.set(socket.id, true);
-    socket.join(roomId);
-    socket.emit("role", { isDM: true, name: pname, room: roomId });
-    sendState();
-    io.to(roomId).emit("chat", sys(`${pname} created the table (DM)`));
+    enterRoom(true);
   });
 
-  // Join an existing table. The password decides the role: matching the DM
-  // password makes you DM; matching the player password (or any password if the
-  // room has none) joins you as a player.
-  socket.on("join", ({ room, name, password }) => {
+  // Enter a table you already belong to (no password) — used by "Your tables".
+  socket.on("enterTable", ({ room }) => {
     if (!socket.user) return socket.emit("joinError", "Please log in first.");
     roomId = (room || "").trim().toLowerCase();
-    const pname = socket.user.username;
-    if (!roomId) return socket.emit("joinError", "Please enter a room name.");
-    const roomRow = store.getRoom(roomId);
-    if (!roomRow) {
-      return socket.emit("joinError", "No table with that name. Ask your DM for it, or create one.");
+    const r = store.getRoom(roomId);
+    if (!r) return socket.emit("joinError", "That table no longer exists.");
+    const owner = r.owner_id === socket.user.id;
+    const allowed = owner || socket.user.role === "admin" ||
+      store.isMember(roomId, socket.user.id) || store.isEmailAllowed(roomId, socket.user.email);
+    if (!allowed) return socket.emit("joinError", "You're not on this table yet — ask your GM to add your email, or use the invite password.");
+    enterRoom(owner);
+  });
+
+  // First-time join to someone else's table: by email allow-list OR invite password.
+  socket.on("join", ({ room, password }) => {
+    if (!socket.user) return socket.emit("joinError", "Please log in first.");
+    roomId = (room || "").trim().toLowerCase();
+    if (!roomId) return socket.emit("joinError", "Please enter a table name.");
+    const r = store.getRoom(roomId);
+    if (!r) return socket.emit("joinError", "No table with that name. Ask your GM for it.");
+    if (r.owner_id === socket.user.id) return enterRoom(true);
+    if (store.isEmailAllowed(roomId, socket.user.email)) return enterRoom(false); // on the allow-list
+    const ppw = r.player_password || "";
+    if (ppw) {
+      if ((password || "").trim() === ppw) return enterRoom(false);
+      return socket.emit("joinError", "Wrong invite password for this table.");
     }
-    const pw = (password || "").trim();
-    const dpw = roomRow.dm_password || "";
-    const ppw = roomRow.player_password || "";
-    let isDM = false;
-    if (dpw && pw === dpw) {
-      isDM = true;
-    } else if (ppw && pw !== ppw) {
-      return socket.emit("joinError", "Wrong password for this table.");
-    }
-    names.set(socket.id, pname);
-    dmFlags.set(socket.id, isDM);
-    socket.join(roomId);
-    store.touchRoom(roomId);
-    socket.emit("role", { isDM, name: pname, room: roomId });
-    sendState();
-    io.to(roomId).emit("chat", sys(`${pname} joined${isDM ? " (DM)" : ""}`));
+    // No password set: open table only if it has no allow-list.
+    if (store.listAllowedEmails(roomId).length === 0) return enterRoom(false);
+    return socket.emit("joinError", "You're not on this table's player list. Ask your GM to add your email.");
+  });
+
+  // The tables this account owns, has joined, or is invited to (dashboard list).
+  socket.on("myTables", () => {
+    if (!socket.user) return;
+    socket.emit("myTablesList", store.getUserTables(socket.user.id, socket.user.email));
+  });
+
+  // A player requests GM access (admins approve in their panel; email later).
+  socket.on("requestGm", () => {
+    if (!socket.user) return;
+    store.setGmRequested(socket.user.id, 1);
+    socket.emit("gmRequested");
+  });
+
+  // The owner (or admin) manages a table's allowed player emails while in it.
+  function ownsRoom() {
+    const r = store.getRoom(roomId);
+    return r && socket.user && (r.owner_id === socket.user.id || socket.user.role === "admin");
+  }
+  socket.on("listAllowed", () => { if (roomId && ownsRoom()) socket.emit("allowedEmails", store.listAllowedEmails(roomId)); });
+  socket.on("addAllowed", (email) => {
+    if (!roomId || !ownsRoom() || !/^\S+@\S+\.\S+$/.test(String(email || ""))) return;
+    store.addAllowedEmail(roomId, email);
+    socket.emit("allowedEmails", store.listAllowedEmails(roomId));
+  });
+  socket.on("removeAllowed", (email) => {
+    if (!roomId || !ownsRoom()) return;
+    store.removeAllowedEmail(roomId, email);
+    socket.emit("allowedEmails", store.listAllowedEmails(roomId));
   });
 
   // --- Spell lighting effects ----------------------------------------------
@@ -306,9 +345,14 @@ io.on("connection", (socket) => {
   // --- Account management (system admin role) ------------------------------
   const isAdmin = () => socket.user && socket.user.role === "admin";
   const adminCount = () => store.listUsers().filter((u) => u.role === "admin").length;
+  const userListPayload = () => store.listUsers().map((u) => ({
+    id: u.id, username: u.username, name: u.name, email: u.email, role: u.role,
+    gm_requested: u.gm_requested, created_at: u.created_at,
+    tables: store.getUserTables(u.id, u.email),
+  }));
   socket.on("adminUsers", () => {
     if (!isAdmin()) return socket.emit("adminError", "Admins only.");
-    socket.emit("adminUserList", store.listUsers());
+    socket.emit("adminUserList", userListPayload());
   });
   socket.on("adminSetRole", ({ id, role }) => {
     if (!isAdmin() || !["player", "gm", "admin"].includes(role)) return;
@@ -317,7 +361,20 @@ io.on("connection", (socket) => {
     if (target.role === "admin" && role !== "admin" && adminCount() <= 1)
       return socket.emit("adminError", "Can't remove the last admin.");
     store.setUserRole(id, role);
-    socket.emit("adminUserList", store.listUsers());
+    store.setGmRequested(id, 0); // any pending GM request is now resolved
+    socket.emit("adminUserList", userListPayload());
+  });
+  socket.on("adminDenyGm", (id) => {
+    if (!isAdmin()) return;
+    store.setGmRequested(id, 0);
+    socket.emit("adminUserList", userListPayload());
+  });
+  socket.on("adminResetPassword", ({ id, newPassword }) => {
+    if (!isAdmin()) return;
+    if (!newPassword || String(newPassword).length < 6) return socket.emit("adminError", "New password must be at least 6 characters.");
+    if (!store.getUserById(id)) return;
+    store.setUserPassword(id, bcrypt.hashSync(String(newPassword), 10));
+    socket.emit("adminNotice", "Password reset ✓");
   });
   socket.on("adminDeleteUser", (id) => {
     if (!isAdmin()) return;
@@ -327,7 +384,7 @@ io.on("connection", (socket) => {
     if (target.role === "admin" && adminCount() <= 1)
       return socket.emit("adminError", "Can't delete the last admin.");
     store.deleteUser(id);
-    socket.emit("adminUserList", store.listUsers());
+    socket.emit("adminUserList", userListPayload());
   });
 
   // --- Owner room management (admin.key password) --------------------------

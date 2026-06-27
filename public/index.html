@@ -24,49 +24,64 @@
         <button id="login-btn">Log in</button>
       </div>
       <div id="signup-form" class="hidden">
+        <label>Your name <input id="signup-name" placeholder="e.g. Dwayne" /></label>
+        <label>Email <input id="signup-email" type="email" placeholder="you@example.com" /></label>
         <label>Username <input id="signup-user" placeholder="3–20 letters, numbers, _" /></label>
         <label>Password <input id="signup-pass" type="password" placeholder="at least 6 characters" /></label>
-        <label>I want to…
-          <select id="signup-role">
-            <option value="player">Play in games (Player)</option>
-            <option value="gm">Run games (Game Master)</option>
-          </select>
-        </label>
+        <p class="join-hint">New accounts join as Players. Want to run games? After signing up, request Game Master access and an admin will approve it.</p>
         <button id="signup-btn">Create account</button>
       </div>
       <p id="auth-error" class="auth-error"></p>
     </div>
   </div>
 
-  <!-- Join screen -->
+  <!-- Join screen / dashboard -->
   <div id="join-screen" class="join-screen hidden">
     <div class="join-card">
-      <h1>⚔️ D&D Virtual Tabletop</h1>
+      <h1 id="welcome">⚔️ D&D Virtual Tabletop</h1>
+
+      <h3 class="dash-h">Your tables</h3>
+      <div id="my-tables" class="my-tables"></div>
+
       <div class="mode-tabs">
-        <button id="mode-join" class="mode-tab active">Join a table</button>
+        <button id="mode-join" class="mode-tab active">Join a new table</button>
         <button id="mode-create" class="mode-tab">Create a table</button>
       </div>
 
-      <!-- JOIN -->
+      <!-- JOIN a table someone shared with you (first time) -->
       <div id="join-form">
-        <label>Room <input id="join-room" placeholder="e.g. curse-of-strahd" /></label>
-        <label>Password <input id="join-pw" type="password" placeholder="the table's password" /></label>
-        <p class="join-hint">Enter the DM password to run the game, or the player password to play. Ask your DM for the table name &amp; password.</p>
-        <button id="join-btn">Enter table</button>
+        <label>Table name <input id="join-room" placeholder="e.g. curse-of-strahd" /></label>
+        <label>Invite password <input id="join-pw" type="password" placeholder="ask your GM (if the table has one)" /></label>
+        <p class="join-hint">Joining a friend's game for the first time? Enter the table name and its invite password. After that it'll show up in "Your tables" above.</p>
+        <button id="join-btn">Join table</button>
       </div>
 
-      <!-- CREATE -->
+      <!-- CREATE (GM/admin) -->
       <div id="create-form" class="hidden">
-        <label>Room name <input id="create-room" placeholder="e.g. curse-of-strahd" /></label>
-        <label>DM password <input id="create-dm" type="password" placeholder="kept secret — makes you the DM" /></label>
-        <label>Player password <input id="create-player" type="password" placeholder="optional — share with your players" /></label>
-        <p class="join-hint">You'll be the DM. Players join with the table name and the player password. Leave player password blank to let anyone with the name join.</p>
+        <label>Table name <input id="create-room" placeholder="e.g. curse-of-strahd" /></label>
+        <label>Invite password <input id="create-player" type="password" placeholder="optional — share with your players" /></label>
+        <p class="join-hint">You'll be the Game Master. Share the table name + invite password with your players so they can join the first time.</p>
         <button id="create-btn">Create table</button>
       </div>
 
+      <button id="request-gm" class="link-btn hidden">Request Game Master access</button>
       <button id="accounts-link" class="link-btn hidden">Manage accounts (admin)</button>
       <button id="admin-link" class="link-btn">Manage rooms (owner)</button>
       <button id="logout-join" class="link-btn">Log out</button>
+    </div>
+  </div>
+
+  <!-- DM: manage which players can join this table -->
+  <div id="players-overlay" class="admin-overlay hidden">
+    <div class="admin-card">
+      <h2>Players for this table</h2>
+      <p class="join-hint">Add a player's account email so they can join. They can also join with the invite password if you set one.</p>
+      <div class="ref-search">
+        <input id="allow-email" type="email" placeholder="player@example.com" />
+        <button id="allow-add">Add</button>
+      </div>
+      <div id="allow-list" class="admin-list"></div>
+      <button id="players-close" class="btn-secondary">Close</button>
     </div>
   </div>
 
@@ -106,6 +121,7 @@
         <button id="map-save" class="btn-secondary dm-only" title="Save this map URL to the library">★</button>
         <button id="map-upload" class="btn-secondary dm-only" title="Upload a map image from your computer">⬆ Map</button>
         <button id="map-rotate" class="btn-secondary dm-only" title="Rotate the map 90°">⟳</button>
+        <button id="players-btn" class="btn-secondary dm-only" title="Manage who can join this table">👥 Players</button>
         <button id="logout-btn" class="btn-secondary" title="Log out">⎋ Log out</button>
         <button id="add-token" class="dm-only">+ Token</button>
         <button id="add-portrait" class="dm-only" title="Add a token with a portrait image">+ 📷</button>

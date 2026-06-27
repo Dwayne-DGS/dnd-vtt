@@ -29,12 +29,41 @@ function showLanding(user) {
   window.account = user;
   authScreen.classList.add("hidden");
   joinScreen.classList.remove("hidden");
+  document.getElementById("welcome").textContent = "⚔️ Welcome, " + (user.name || user.username);
   // Only GMs / admins may create tables.
   const canCreate = user.role === "gm" || user.role === "admin";
   document.getElementById("mode-create").classList.toggle("hidden", !canCreate);
   if (!canCreate) document.getElementById("mode-join").click();
   document.getElementById("accounts-link").classList.toggle("hidden", user.role !== "admin");
+  // Players can request GM access (hidden once they're GM/admin).
+  const reqBtn = document.getElementById("request-gm");
+  reqBtn.classList.toggle("hidden", user.role !== "player");
+  if (user.gmRequested) { reqBtn.textContent = "Game Master access requested ✓"; reqBtn.disabled = true; }
+  // Load this account's tables for the dashboard list.
+  socket.connect();
+  socket.emit("myTables");
+  if (user.role === "admin") socket.emit("adminUsers"); // refreshes the pending badge (won't open the panel)
 }
+
+document.getElementById("request-gm").addEventListener("click", () => { socket.connect(); socket.emit("requestGm"); });
+socket.on("gmRequested", () => {
+  const b = document.getElementById("request-gm");
+  b.textContent = "Game Master access requested ✓"; b.disabled = true;
+});
+
+// Render the "Your tables" list; click one to jump straight in.
+socket.on("myTablesList", (tables) => {
+  const box = document.getElementById("my-tables");
+  box.innerHTML = "";
+  if (!tables.length) { box.innerHTML = "<p class='join-hint' style='margin:0 0 8px'>No tables yet. Create one below, or join a friend's with its name + invite password.</p>"; return; }
+  tables.forEach((t) => {
+    const b = document.createElement("button");
+    b.className = "table-row";
+    b.innerHTML = `<span>${escAcct(t.id)}</span><span class="table-role">${t.role === "gm" ? "GM" : "Player"}</span>`;
+    b.addEventListener("click", () => { socket.connect(); socket.emit("enterTable", { room: t.id }); });
+    box.appendChild(b);
+  });
+});
 async function authPost(path, body) {
   const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
@@ -69,9 +98,10 @@ document.getElementById("signup-btn").addEventListener("click", async () => {
   authErr.textContent = "";
   try {
     const { user } = await authPost("/auth/signup", {
+      name: document.getElementById("signup-name").value,
+      email: document.getElementById("signup-email").value,
       username: document.getElementById("signup-user").value,
       password: document.getElementById("signup-pass").value,
-      role: document.getElementById("signup-role").value,
     });
     showLanding(user);
   } catch (e) { authErr.textContent = e.message; }
@@ -83,30 +113,73 @@ document.getElementById("logout-btn").addEventListener("click", logout);
 // --- Account management (admin) -----------------------------------------
 const accountsOverlay = document.getElementById("accounts-overlay");
 const accountsListEl = document.getElementById("accounts-list");
-document.getElementById("accounts-link").addEventListener("click", () => { socket.connect(); socket.emit("adminUsers"); });
+let openAccounts = false;
+document.getElementById("accounts-link").addEventListener("click", () => { openAccounts = true; socket.connect(); socket.emit("adminUsers"); });
 document.getElementById("accounts-close").addEventListener("click", () => accountsOverlay.classList.add("hidden"));
 socket.on("adminUserList", (users) => {
+  // Update the pending-request badge on the link (in-app notification).
+  const pending = users.filter((u) => u.gm_requested).length;
+  const link = document.getElementById("accounts-link");
+  link.textContent = "Manage accounts (admin)" + (pending ? `  •  ${pending} GM request${pending > 1 ? "s" : ""}` : "");
+  if (!openAccounts) return; // landing refresh only updates the badge
+  openAccounts = false;
   accountsListEl.innerHTML = "";
   const fmtDate = (ts) => (ts ? new Date(ts).toLocaleDateString() : "—");
   users.forEach((u) => {
     const row = document.createElement("div");
-    row.className = "admin-room";
+    row.className = "acct-card";
+    const tables = (u.tables || []).map((t) => `${escAcct(t.id)} (${t.role === "gm" ? "GM" : "P"})`).join(", ") || "none";
+    const reqBadge = u.gm_requested ? ` <span class="req-badge">wants GM</span>` : "";
     row.innerHTML = `
-      <div style="flex:1">
-        <div class="ar-name">${escAcct(u.username)}</div>
-        <div class="ar-meta">joined ${fmtDate(u.created_at)}</div>
+      <div class="acct-info">
+        <div class="ar-name">${escAcct(u.name || u.username)} <span class="ar-meta">@${escAcct(u.username)}</span>${reqBadge}</div>
+        <div class="ar-meta">${escAcct(u.email || "no email")} · joined ${fmtDate(u.created_at)}</div>
+        <div class="ar-meta">tables: ${tables}</div>
       </div>
-      <select class="acct-role">
-        <option value="player"${u.role === "player" ? " selected" : ""}>Player</option>
-        <option value="gm"${u.role === "gm" ? " selected" : ""}>Game Master</option>
-        <option value="admin"${u.role === "admin" ? " selected" : ""}>Admin</option>
-      </select>
-      <button>Delete</button>`;
+      <div class="acct-controls">
+        ${u.gm_requested ? '<button class="acct-approve">✓ Make GM</button><button class="acct-deny btn-secondary">Deny</button>' : ""}
+        <select class="acct-role">
+          <option value="player"${u.role === "player" ? " selected" : ""}>Player</option>
+          <option value="gm"${u.role === "gm" ? " selected" : ""}>Game Master</option>
+          <option value="admin"${u.role === "admin" ? " selected" : ""}>Admin</option>
+        </select>
+        <button class="acct-reset btn-secondary">Reset password</button>
+        <button class="acct-del">Delete</button>
+      </div>`;
     row.querySelector(".acct-role").addEventListener("change", (e) => socket.emit("adminSetRole", { id: u.id, role: e.target.value }));
-    row.querySelector("button").addEventListener("click", () => { if (confirm(`Delete account "${u.username}"?`)) socket.emit("adminDeleteUser", u.id); });
+    row.querySelector(".acct-reset").addEventListener("click", () => {
+      const np = prompt(`New password for "${u.username}" (at least 6 characters):`);
+      if (np) socket.emit("adminResetPassword", { id: u.id, newPassword: np });
+    });
+    row.querySelector(".acct-del").addEventListener("click", () => { if (confirm(`Delete account "${u.username}"?`)) socket.emit("adminDeleteUser", u.id); });
+    row.querySelector(".acct-approve")?.addEventListener("click", () => socket.emit("adminSetRole", { id: u.id, role: "gm" }));
+    row.querySelector(".acct-deny")?.addEventListener("click", () => socket.emit("adminDenyGm", u.id));
     accountsListEl.appendChild(row);
   });
   accountsOverlay.classList.remove("hidden");
+});
+socket.on("adminNotice", (m) => alert(m));
+
+// --- DM: manage allowed player emails for the current table --------------
+const playersOverlay = document.getElementById("players-overlay");
+const allowListEl = document.getElementById("allow-list");
+document.getElementById("players-btn")?.addEventListener("click", () => { socket.emit("listAllowed"); playersOverlay.classList.remove("hidden"); });
+document.getElementById("players-close")?.addEventListener("click", () => playersOverlay.classList.add("hidden"));
+document.getElementById("allow-add")?.addEventListener("click", () => {
+  const inp = document.getElementById("allow-email");
+  const email = inp.value.trim();
+  if (email) { socket.emit("addAllowed", email); inp.value = ""; }
+});
+socket.on("allowedEmails", (emails) => {
+  allowListEl.innerHTML = "";
+  if (!emails.length) { allowListEl.innerHTML = "<p class='join-hint' style='margin:0'>No emails added yet. Players can still use the invite password if you set one.</p>"; return; }
+  emails.forEach((em) => {
+    const row = document.createElement("div");
+    row.className = "admin-room";
+    row.innerHTML = `<span class="ar-name" style="flex:1">${escAcct(em)}</span><button>Remove</button>`;
+    row.querySelector("button").addEventListener("click", () => socket.emit("removeAllowed", em));
+    allowListEl.appendChild(row);
+  });
 });
 function escAcct(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
@@ -160,12 +233,10 @@ function doJoin() {
 }
 function doCreate() {
   const room = document.getElementById("create-room").value.trim();
-  const dmPassword = document.getElementById("create-dm").value;
   const playerPassword = document.getElementById("create-player").value;
-  if (!room) { alert("Enter a room name."); return; }
-  if (!dmPassword) { alert("Set a DM password to create a table."); return; }
+  if (!room) { alert("Enter a table name."); return; }
   socket.connect();
-  socket.emit("createRoom", { room, dmPassword, playerPassword });
+  socket.emit("createRoom", { room, playerPassword });
 }
 document.getElementById("join-btn").addEventListener("click", doJoin);
 document.getElementById("join-pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doJoin(); });

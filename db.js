@@ -59,6 +59,19 @@ db.exec(`
     user_id    TEXT NOT NULL,
     created_at INTEGER
   );
+
+  CREATE TABLE IF NOT EXISTS room_members (
+    room_id   TEXT NOT NULL,
+    user_id   TEXT NOT NULL,
+    joined_at INTEGER,
+    PRIMARY KEY (room_id, user_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS room_invites (
+    room_id TEXT NOT NULL,
+    email   TEXT NOT NULL,
+    PRIMARY KEY (room_id, email)
+  );
 `);
 
 // Migrations: add columns to existing databases that predate them.
@@ -72,6 +85,11 @@ if (!roomCols.includes("last_active")) db.exec("ALTER TABLE rooms ADD COLUMN las
 if (!roomCols.includes("map_rotation")) db.exec("ALTER TABLE rooms ADD COLUMN map_rotation INTEGER DEFAULT 0");
 if (!roomCols.includes("grid_on")) db.exec("ALTER TABLE rooms ADD COLUMN grid_on INTEGER DEFAULT 0");
 if (!roomCols.includes("grid_size")) db.exec("ALTER TABLE rooms ADD COLUMN grid_size INTEGER DEFAULT 64");
+if (!roomCols.includes("owner_id")) db.exec("ALTER TABLE rooms ADD COLUMN owner_id TEXT");
+const userCols = db.prepare("PRAGMA table_info(users)").all().map((c) => c.name);
+if (userCols.length && !userCols.includes("name")) db.exec("ALTER TABLE users ADD COLUMN name TEXT");
+if (userCols.length && !userCols.includes("email")) db.exec("ALTER TABLE users ADD COLUMN email TEXT");
+if (userCols.length && !userCols.includes("gm_requested")) db.exec("ALTER TABLE users ADD COLUMN gm_requested INTEGER DEFAULT 0");
 const tokenCols = db.prepare("PRAGMA table_info(tokens)").all().map((c) => c.name);
 if (!tokenCols.includes("img")) db.exec("ALTER TABLE tokens ADD COLUMN img TEXT");
 if (!tokenCols.includes("hp")) db.exec("ALTER TABLE tokens ADD COLUMN hp INTEGER");
@@ -153,6 +171,8 @@ export const deleteRoom = db.transaction((roomId) => {
   _delRoomTokens.run(roomId);
   _delRoomChars.run(roomId);
   _delRoomCreatures.run(roomId);
+  db.prepare("DELETE FROM room_members WHERE room_id = ?").run(roomId);
+  db.prepare("DELETE FROM room_invites WHERE room_id = ?").run(roomId);
   // Saved maps are a shared library, so they are intentionally NOT deleted here.
   _delRoom.run(roomId);
 });
@@ -246,25 +266,63 @@ export function deleteMapEntry(id) {
 }
 
 // --- Users & sessions ------------------------------------------------------
-const _createUser = db.prepare("INSERT INTO users (id, username, pass_hash, role, created_at) VALUES (@id, @username, @pass_hash, @role, @created_at)");
+const _createUser = db.prepare("INSERT INTO users (id, username, name, email, pass_hash, role, created_at) VALUES (@id, @username, @name, @email, @pass_hash, @role, @created_at)");
 const _userByName = db.prepare("SELECT * FROM users WHERE username = ?");
 const _userById = db.prepare("SELECT * FROM users WHERE id = ?");
 const _countUsers = db.prepare("SELECT COUNT(*) n FROM users");
-const _listUsers = db.prepare("SELECT id, username, role, created_at FROM users ORDER BY created_at");
+const _listUsers = db.prepare("SELECT id, username, name, email, role, gm_requested, created_at FROM users ORDER BY created_at");
 const _setRole = db.prepare("UPDATE users SET role = ? WHERE id = ?");
+const _setPass = db.prepare("UPDATE users SET pass_hash = ? WHERE id = ?");
+const _setGmReq = db.prepare("UPDATE users SET gm_requested = ? WHERE id = ?");
 const _delUser = db.prepare("DELETE FROM users WHERE id = ?");
 const _createSession = db.prepare("INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)");
 const _sessionUser = db.prepare("SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?");
 const _delSession = db.prepare("DELETE FROM sessions WHERE token = ?");
 const _delUserSessions = db.prepare("DELETE FROM sessions WHERE user_id = ?");
 
-export function createUser(u) { _createUser.run({ ...u, created_at: Date.now() }); }
+export function createUser(u) { _createUser.run({ name: null, email: null, ...u, created_at: Date.now() }); }
 export function getUserByUsername(name) { return _userByName.get(name); }
 export function getUserById(id) { return _userById.get(id); }
 export function countUsers() { return _countUsers.get().n; }
 export function listUsers() { return _listUsers.all(); }
 export function setUserRole(id, role) { _setRole.run(role, id); }
+export function setUserPassword(id, hash) { _setPass.run(hash, id); }
+export function setGmRequested(id, v) { _setGmReq.run(v ? 1 : 0, id); }
 export function deleteUser(id) { _delUserSessions.run(id); _delUser.run(id); }
+
+// --- Room ownership & membership ------------------------------------------
+const _setOwner = db.prepare("UPDATE rooms SET owner_id = ? WHERE id = ?");
+const _addMember = db.prepare("INSERT OR IGNORE INTO room_members (room_id, user_id, joined_at) VALUES (?, ?, ?)");
+const _isMember = db.prepare("SELECT 1 FROM room_members WHERE room_id = ? AND user_id = ?");
+const _delRoomMembers = db.prepare("DELETE FROM room_members WHERE room_id = ?");
+const _membersOf = db.prepare("SELECT user_id FROM room_members WHERE room_id = ?");
+const _userTables = db.prepare(`
+  SELECT id, owner_id FROM rooms
+  WHERE owner_id = @uid
+     OR id IN (SELECT room_id FROM room_members WHERE user_id = @uid)
+     OR id IN (SELECT room_id FROM room_invites WHERE email = @email)
+  ORDER BY last_active DESC, created_at DESC
+`);
+const _ownedTables = db.prepare("SELECT id FROM rooms WHERE owner_id = ?");
+
+export function setRoomOwner(roomId, uid) { _setOwner.run(uid, roomId); }
+export function addMember(roomId, uid) { _addMember.run(roomId, uid, Date.now()); }
+export function isMember(roomId, uid) { return !!_isMember.get(roomId, uid); }
+export function membersOf(roomId) { return _membersOf.all(roomId).map((r) => r.user_id); }
+export function getUserTables(uid, email) {
+  return _userTables.all({ uid, email: (email || "").toLowerCase() }).map((r) => ({ id: r.id, role: r.owner_id === uid ? "gm" : "player" }));
+}
+export function ownedTableIds(uid) { return _ownedTables.all(uid).map((r) => r.id); }
+
+// Per-table allowed player emails (an alternative to the invite password).
+const _addInvite = db.prepare("INSERT OR IGNORE INTO room_invites (room_id, email) VALUES (?, ?)");
+const _delInvite = db.prepare("DELETE FROM room_invites WHERE room_id = ? AND email = ?");
+const _listInvites = db.prepare("SELECT email FROM room_invites WHERE room_id = ?");
+const _isAllowed = db.prepare("SELECT 1 FROM room_invites WHERE room_id = ? AND email = ?");
+export function addAllowedEmail(roomId, email) { _addInvite.run(roomId, String(email).toLowerCase()); }
+export function removeAllowedEmail(roomId, email) { _delInvite.run(roomId, String(email).toLowerCase()); }
+export function listAllowedEmails(roomId) { return _listInvites.all(roomId).map((r) => r.email); }
+export function isEmailAllowed(roomId, email) { return email ? !!_isAllowed.get(roomId, String(email).toLowerCase()) : false; }
 export function createSession(token, userId) { _createSession.run(token, userId, Date.now()); }
 export function getSessionUser(token) { return token ? _sessionUser.get(token) : null; }
 export function deleteSession(token) { _delSession.run(token); }

@@ -185,18 +185,30 @@ rate-limited per person.
 
 ## Accounts & login
 
-The whole app is gated behind a login. Visitors **create an account** (username +
-password — hashed with bcrypt, stored in the database; sessions via a secure
-cookie). At sign-up they choose a role:
+The whole app is gated behind a login. Visitors **create an account** with their
+**name, email, username & password** (password hashed with bcrypt; sessions via a
+secure cookie). After login you land on a **dashboard** listing **your tables** —
+click one to jump straight in (no password). GMs get a Create button; joining a new
+table for the first time uses its invite password, after which it joins your list.
+At sign-up they choose a role:
 
-- **Game Master** — can create tables (and is the DM of tables they create).
-- **Player** — can join tables but not create them.
+- **Everyone signs up as a Player.** Players can request **Game Master access** from
+  the dashboard; pending requests show up in the admin's "Manage accounts" panel
+  (with a count badge) where the admin approves or denies them. (Email notifications
+  to the admin can be added later — just needs a free email provider like Resend.)
+- **Game Master** — can create tables (owns and DMs tables they create).
+- **Player** — joins tables but can't create them.
 - The **very first account created becomes the system admin**.
+
+**Table access:** a DM opens **👥 Players** in their table to add players' **email
+addresses** to an allow-list — anyone with a matching account email can join with no
+password. Alternatively a table can have an **invite password**. Either gets a player in.
 
 No third-party service, no configuration, no cost — it's all in-house.
 
 **Manage accounts:** an admin sees a **"Manage accounts (admin)"** link on the
-landing screen — list everyone, change roles (Player/GM/Admin), or remove accounts.
+landing screen — see each member's name, email, role, and their tables; change
+roles (Player/GM/Admin), **reset a forgotten password**, or remove accounts.
 The last admin can't be demoted or deleted (so you never lock yourself out).
 
 **Make yourself admin (on the server):** the first account created is admin
