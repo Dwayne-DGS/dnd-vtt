@@ -21,6 +21,9 @@ hue-helper/config.json
 # Anthropic API key for the AI assistant — server only, never committed
 claude.key
 
+# SSO / OAuth client secrets (Google, Discord) — server only, never committed
+oauth.json
+
 # The big self-contained installer is only needed for the no-GitHub method
 install-on-server.sh
 

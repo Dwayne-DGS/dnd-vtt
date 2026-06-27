@@ -360,6 +360,14 @@ fetch("/auth/me").then((r) => r.json()).then(({ user }) => {
   else showAuth();
 }).catch(showAuth);
 
+// Show SSO buttons only for providers configured on the server.
+fetch("/auth/providers").then((r) => r.json()).then((p) => {
+  let any = false;
+  if (p.discord) { document.getElementById("sso-discord").classList.remove("hidden"); any = true; }
+  if (p.google) { document.getElementById("sso-google").classList.remove("hidden"); any = true; }
+  if (any) document.getElementById("sso-buttons").classList.remove("hidden");
+}).catch(() => {});
+
 // Role is decided by the server from the DM password. We mirror it to the body
 // class (CSS hides .dm-only controls for players) and to window.isDM /
 // window.playerName for the feature modules to read. Registered before connect

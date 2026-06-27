@@ -126,6 +126,16 @@ select { cursor: pointer; }
 .dash-admin .link-btn { color: var(--gold-2); }
 .join-hint { color: var(--muted); font-size: 12px; text-align: left; margin: 10px 0 0; line-height: 1.5; }
 .auth-error { color: #e89b9b; font-size: 13px; min-height: 16px; margin: 12px 0 0; }
+/* SSO buttons */
+.sso-buttons { margin-top: 16px; }
+.sso-buttons.hidden { display: none; }
+.sso-divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; margin: 4px 0 14px; }
+.sso-divider::before, .sso-divider::after { content: ""; flex: 1; height: 1px; background: var(--border-2); }
+.sso-btn { display: block; text-align: center; padding: 11px; border-radius: var(--radius); font-weight: 600; font-size: 14px; margin-bottom: 8px; color: #fff; text-decoration: none; }
+.sso-btn.hidden { display: none; }
+.sso-discord { background: #5865F2; }
+.sso-google { background: #ffffff; color: #1f1f1f; border: 1px solid #dadce0; }
+.sso-btn:hover { filter: brightness(1.05); }
 .dash-h { text-align: left; margin: 6px 0 8px; color: var(--gold-2); font-size: 15px; }
 /* Trial / subscription banner */
 .trial-banner { text-align: left; font-size: 13px; line-height: 1.5; padding: 10px 14px; border-radius: var(--radius); margin: 0 0 16px; background: var(--panel-2); border: 1px solid var(--border-2); }

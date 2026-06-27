@@ -157,3 +157,11 @@ img { max-width: 100%; display: block; }
 .page-head { text-align: center; padding: 64px 0 8px; }
 .page-head h1 { font-size: clamp(32px, 5vw, 48px); margin: 0 0 10px; }
 .page-head p { color: var(--muted); font-size: 18px; max-width: 640px; margin: 0 auto; }
+
+/* Legal pages (Terms, Acceptable Use) */
+.legal { max-width: 760px; margin: 0 auto; }
+.legal h2 { font-size: 20px; color: var(--gold-2); margin: 30px 0 8px; }
+.legal p { color: var(--ink); font-size: 15.5px; line-height: 1.75; margin: 10px 0; }
+.legal ul { padding-left: 22px; margin: 8px 0; }
+.legal li { color: var(--ink); font-size: 15.5px; line-height: 1.7; margin: 6px 0; }
+.legal a { color: var(--gold-2); }

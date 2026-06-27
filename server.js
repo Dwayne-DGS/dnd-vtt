@@ -125,6 +125,102 @@ app.post("/auth/logout", (req, res) => {
 
 app.get("/auth/me", (req, res) => res.json({ user: pubUser(userFromReq(req)) }));
 
+// --- Single sign-on (Google / Discord OAuth) ------------------------------
+// Credentials live in an `oauth.json` file in the app dir (gitignored), shaped:
+//   { "google": {"clientId":"…","clientSecret":"…"}, "discord": {"clientId":"…","clientSecret":"…"} }
+// If the file (or a provider) is absent, that sign-in button simply won't appear.
+const OAUTH_FILE = join(__dirname, "oauth.json");
+function oauthCfg() { try { return JSON.parse(readFileSync(OAUTH_FILE, "utf8")); } catch { return {}; } }
+const OAUTH = {
+  google: {
+    authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+    tokenUrl: "https://oauth2.googleapis.com/token",
+    profileUrl: "https://www.googleapis.com/oauth2/v3/userinfo",
+    scope: "openid email profile",
+    extra: { access_type: "online", prompt: "select_account" },
+    profile: (d) => ({ id: d.sub, email: d.email, name: d.name || d.given_name }),
+  },
+  discord: {
+    authUrl: "https://discord.com/oauth2/authorize",
+    tokenUrl: "https://discord.com/api/oauth2/token",
+    profileUrl: "https://discord.com/api/users/@me",
+    scope: "identify email",
+    extra: {},
+    profile: (d) => ({ id: d.id, email: d.email, name: d.global_name || d.username }),
+  },
+};
+const publicBase = (req) => process.env.PUBLIC_URL || ("https://" + req.get("host"));
+const redirectUri = (req, provider) => `${publicBase(req)}/auth/${provider}/callback`;
+
+// Which providers are configured (the client shows only these buttons).
+app.get("/auth/providers", (_req, res) => {
+  const c = oauthCfg();
+  res.json({ google: !!(c.google && c.google.clientId), discord: !!(c.discord && c.discord.clientId) });
+});
+
+// Step 1: redirect the user to the provider's consent screen.
+app.get("/auth/:provider/start", (req, res) => {
+  const provider = req.params.provider;
+  const P = OAUTH[provider], cfg = oauthCfg()[provider];
+  if (!P || !cfg || !cfg.clientId) return res.status(404).send("That sign-in option isn't available.");
+  const state = randomBytes(16).toString("hex");
+  res.setHeader("Set-Cookie", `oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
+  const u = new URL(P.authUrl);
+  u.searchParams.set("client_id", cfg.clientId);
+  u.searchParams.set("redirect_uri", redirectUri(req, provider));
+  u.searchParams.set("response_type", "code");
+  u.searchParams.set("scope", P.scope);
+  u.searchParams.set("state", state);
+  for (const [k, v] of Object.entries(P.extra)) u.searchParams.set(k, v);
+  res.redirect(u.toString());
+});
+
+// Step 2: provider redirects back with a code; exchange it, look up/create the user.
+app.get("/auth/:provider/callback", async (req, res) => {
+  const provider = req.params.provider;
+  const P = OAUTH[provider], cfg = oauthCfg()[provider];
+  if (!P || !cfg || !cfg.clientId) return res.redirect("/play");
+  const { code, state } = req.query;
+  const cookieState = parseCookies(req.headers.cookie)["oauth_state"];
+  if (!code || !state || state !== cookieState) return res.status(400).send("Sign-in failed (security check). Please try again.");
+  try {
+    const body = new URLSearchParams({
+      client_id: cfg.clientId, client_secret: cfg.clientSecret, grant_type: "authorization_code",
+      code: String(code), redirect_uri: redirectUri(req, provider),
+    });
+    const tr = await fetch(P.tokenUrl, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, body });
+    if (!tr.ok) throw new Error("token exchange " + tr.status);
+    const tok = await tr.json();
+    const pr = await fetch(P.profileUrl, { headers: { Authorization: "Bearer " + tok.access_token } });
+    if (!pr.ok) throw new Error("profile fetch " + pr.status);
+    const prof = P.profile(await pr.json());
+    if (!prof.id) throw new Error("no account id from provider");
+
+    // Find by provider id, else link by email, else create a fresh account.
+    let user = store.getUserByProvider(provider, prof.id);
+    if (!user && prof.email) {
+      const byEmail = store.getUserByEmail(prof.email);
+      if (byEmail) { store.linkProvider(byEmail.id, provider, prof.id); user = byEmail; }
+    }
+    if (!user) {
+      let base = String(prof.name || (prof.email || "").split("@")[0] || provider).toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 16) || provider;
+      let uname = base, n = 1;
+      while (store.usernameTaken(uname)) uname = (base + n++).slice(0, 20);
+      const id = randomUUID();
+      const role = store.countUsers() === 0 ? "admin" : "player";
+      store.createOAuthUser({ id, username: uname, name: prof.name || uname, email: prof.email || null, pass_hash: bcrypt.hashSync(randomBytes(24).toString("hex"), 10), role, provider, provider_id: prof.id });
+      user = store.getUserById(id);
+    }
+    const token = randomBytes(32).toString("hex");
+    store.createSession(token, user.id);
+    setSessionCookie(res, token);
+    res.redirect("/play");
+  } catch (e) {
+    console.error("OAuth error:", e.message);
+    res.status(500).send("Sign-in failed. Please try again.");
+  }
+});
+
 // Image upload (maps & token portraits). Streams the raw request body to a file
 // under public/uploads and returns its public URL. Image types only, size-capped.
 // Note: setting a map / placing a token is still DM-gated over the socket, so an

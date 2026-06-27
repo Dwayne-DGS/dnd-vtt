@@ -128,6 +128,11 @@ if (userCols.length && !userCols.includes("ai_used")) db.exec("ALTER TABLE users
 if (userCols.length && !userCols.includes("ai_period")) db.exec("ALTER TABLE users ADD COLUMN ai_period TEXT");
 if (userCols.length && !userCols.includes("ai_cost")) db.exec("ALTER TABLE users ADD COLUMN ai_cost REAL DEFAULT 0");      // raw API $ used this month
 if (userCols.length && !userCols.includes("ai_credit")) db.exec("ALTER TABLE users ADD COLUMN ai_credit REAL DEFAULT 0");  // purchased top-up $ remaining
+if (userCols.length && !userCols.includes("provider")) db.exec("ALTER TABLE users ADD COLUMN provider TEXT");        // SSO provider (google|discord)
+if (userCols.length && !userCols.includes("provider_id")) db.exec("ALTER TABLE users ADD COLUMN provider_id TEXT");  // the provider's user id
+if (userCols.length && !userCols.includes("email_verified")) db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 1"); // existing accounts treated as verified
+// Short-lived tokens for password resets and email verification.
+db.exec(`CREATE TABLE IF NOT EXISTS auth_tokens (token TEXT PRIMARY KEY, user_id TEXT, kind TEXT, expires INTEGER)`);
 const tokenCols = db.prepare("PRAGMA table_info(tokens)").all().map((c) => c.name);
 if (!tokenCols.includes("img")) db.exec("ALTER TABLE tokens ADD COLUMN img TEXT");
 if (!tokenCols.includes("hp")) db.exec("ALTER TABLE tokens ADD COLUMN hp INTEGER");
@@ -322,6 +327,16 @@ const _delUserSessions = db.prepare("DELETE FROM sessions WHERE user_id = ?");
 export function createUser(u) { _createUser.run({ name: null, email: null, ...u, created_at: Date.now() }); }
 export function getUserByUsername(name) { return _userByName.get(name); }
 export function getUserById(id) { return _userById.get(id); }
+// --- SSO / OAuth account linking ------------------------------------------
+const _userByProvider = db.prepare("SELECT * FROM users WHERE provider = ? AND provider_id = ?");
+const _userByEmail = db.prepare("SELECT * FROM users WHERE email = ? COLLATE NOCASE");
+const _linkProvider = db.prepare("UPDATE users SET provider = ?, provider_id = ? WHERE id = ?");
+const _createOAuthUser = db.prepare("INSERT INTO users (id, username, name, email, pass_hash, role, created_at, provider, provider_id) VALUES (@id, @username, @name, @email, @pass_hash, @role, @created_at, @provider, @provider_id)");
+export function getUserByProvider(p, pid) { return _userByProvider.get(p, String(pid)); }
+export function getUserByEmail(e) { return e ? _userByEmail.get(e) : null; }
+export function linkProvider(id, p, pid) { _linkProvider.run(p, String(pid), id); }
+export function usernameTaken(name) { return !!_userByName.get(name); }
+export function createOAuthUser(u) { _createOAuthUser.run({ name: null, email: null, created_at: Date.now(), ...u }); }
 export function countUsers() { return _countUsers.get().n; }
 export function listUsers() { return _listUsers.all(); }
 export function setUserRole(id, role) { _setRole.run(role, id); }
@@ -389,6 +404,19 @@ export function isEmailAllowed(roomId, email) { return email ? !!_isAllowed.get(
 export function createSession(token, userId) { _createSession.run(token, userId, Date.now()); }
 export function getSessionUser(token) { return token ? _sessionUser.get(token) : null; }
 export function deleteSession(token) { _delSession.run(token); }
+
+// --- Auth tokens (password reset, email verify) ---------------------------
+const _createTok = db.prepare("INSERT OR REPLACE INTO auth_tokens (token, user_id, kind, expires) VALUES (?, ?, ?, ?)");
+const _getTok = db.prepare("SELECT * FROM auth_tokens WHERE token = ?");
+const _delTok = db.prepare("DELETE FROM auth_tokens WHERE token = ?");
+const _delUserToks = db.prepare("DELETE FROM auth_tokens WHERE user_id = ? AND kind = ?");
+const _setVerified = db.prepare("UPDATE users SET email_verified = ? WHERE id = ?");
+const _admins = db.prepare("SELECT * FROM users WHERE role = 'admin'");
+export function createAuthToken(token, userId, kind, expires) { _delUserToks.run(userId, kind); _createTok.run(token, userId, kind, expires); }
+export function getAuthToken(token) { return token ? _getTok.get(token) : null; }
+export function deleteAuthToken(token) { _delTok.run(token); }
+export function setEmailVerified(id, v) { _setVerified.run(v ? 1 : 0, id); }
+export function listAdmins() { return _admins.all(); }
 
 // --- Journal / session notes ----------------------------------------------
 const _upsertJournal = db.prepare(`
