@@ -1299,10 +1299,9 @@ const CREATURE_TOOL = {
 
 // Search Openverse (openverse.org) for Creative-Commons, commercially-usable
 // images or audio. No API key required. Returns a tidy list for the asset finder.
-async function searchOpenverse(media, query) {
-  const hint = media === "audio" ? "ambience loop" : "fantasy battle map";
-  const url = `https://api.openverse.org/v1/${media}/?q=${encodeURIComponent(query + " " + hint)}` +
-    `&page_size=18&mature=false&license_type=commercial`;
+const OV_STOPWORDS = new Set(["a", "an", "the", "with", "of", "and", "to", "for", "in", "on", "at", "my", "your", "some", "that", "this"]);
+async function ovQuery(media, q) {
+  const url = `https://api.openverse.org/v1/${media}/?q=${encodeURIComponent(q)}&page_size=18&mature=false`;
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 12000);
   let res;
@@ -1322,6 +1321,20 @@ async function searchOpenverse(media, query) {
     thumb: r.thumbnail || r.url || "",
     duration: Math.round((r.duration || 0) / 1000), // ms → s (audio)
   })).filter((x) => x.media);
+}
+// Forgiving search: drop filler words and try a few phrasings until we get hits.
+async function searchOpenverse(media, query) {
+  const clean = query.toLowerCase().split(/\s+/).filter((w) => w && !OV_STOPWORDS.has(w)).join(" ").trim() || query;
+  const hint = media === "audio" ? "ambience" : "map";
+  const tries = [`${clean} ${hint}`, clean, query]; // specific → looser → raw
+  const seen = new Set();
+  for (const q of tries) {
+    if (seen.has(q)) continue;
+    seen.add(q);
+    const items = await ovQuery(media, q);
+    if (items.length) return items;
+  }
+  return [];
 }
 
 async function callClaude({ system, prompt, tool }) {
