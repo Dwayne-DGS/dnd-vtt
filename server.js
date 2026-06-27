@@ -1110,10 +1110,13 @@ io.on("connection", (socket) => {
     if (!roomId || !amDM()) return;
     const q = String(query || "").trim().slice(0, 120);
     if (!q) return socket.emit("assetResults", { kind, items: [], error: "Type what you're looking for." });
+    const t0 = Date.now();
     try {
       const items = await searchOpenverse(kind === "sounds" ? "audio" : "images", q);
+      console.log(`[finder] ${kind} "${q}" -> ${items.length} results in ${Date.now() - t0}ms`);
       socket.emit("assetResults", { kind, items });
     } catch (e) {
+      console.log(`[finder] ${kind} "${q}" -> ERROR ${e.message} in ${Date.now() - t0}ms`);
       socket.emit("assetResults", { kind, items: [], error: "Search failed: " + (e.message || "try again") });
     }
   });
@@ -1303,7 +1306,7 @@ const OV_STOPWORDS = new Set(["a", "an", "the", "with", "of", "and", "to", "for"
 async function ovQuery(media, q) {
   const url = `https://api.openverse.org/v1/${media}/?q=${encodeURIComponent(q)}&page_size=18&mature=false`;
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 12000);
+  const timer = setTimeout(() => ctl.abort(), 8000);
   let res;
   try {
     res = await fetch(url, { headers: { "User-Agent": "warcrimes-vtt/1.0 (+https://warcrimes.us)" }, signal: ctl.signal });
@@ -1326,7 +1329,7 @@ async function ovQuery(media, q) {
 async function searchOpenverse(media, query) {
   const clean = query.toLowerCase().split(/\s+/).filter((w) => w && !OV_STOPWORDS.has(w)).join(" ").trim() || query;
   const hint = media === "audio" ? "ambience" : "map";
-  const tries = [`${clean} ${hint}`, clean, query]; // specific → looser → raw
+  const tries = [`${clean} ${hint}`, clean]; // specific → looser (cap at 2 so it fails fast)
   const seen = new Set();
   for (const q of tries) {
     if (seen.has(q)) continue;

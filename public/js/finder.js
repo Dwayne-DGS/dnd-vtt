@@ -10,6 +10,7 @@ export function initFinder(socket) {
   const results = document.getElementById("finder-results");
   if (!overlay) return;
   let kind = "maps";
+  let pending = null; // safety timeout so the spinner never hangs forever
 
   function open(k) {
     kind = k;
@@ -24,6 +25,10 @@ export function initFinder(socket) {
     if (!q) return;
     results.innerHTML = '<p class="muted">Searching Creative-Commons libraries…</p>';
     socket.emit("findAssets", { kind, query: q });
+    clearTimeout(pending);
+    pending = setTimeout(() => {
+      results.innerHTML = '<p class="muted">The search service is taking too long to respond. Try again, or try shorter words.</p>';
+    }, 20000);
   }
 
   document.getElementById("find-maps")?.addEventListener("click", () => open("maps"));
@@ -37,6 +42,7 @@ export function initFinder(socket) {
 
   socket.on("assetResults", ({ kind: k, items, error }) => {
     if (k !== kind) return;
+    clearTimeout(pending);
     if (error) { results.innerHTML = `<p class="muted">${esc(error)}</p>`; return; }
     if (!items || !items.length) { results.innerHTML = '<p class="muted">No results — try different words.</p>'; return; }
     results.innerHTML = "";
