@@ -133,6 +133,8 @@ const pubUser = (u) => {
     gmEntitled: entitledGM(u), aiEntitled: entitledAI(u),
     aiUsed: Math.min(aiCostThisMonth(u), INCLUDED_AI_USD), aiIncluded: entitledAI(u) ? INCLUDED_AI_USD : 0, aiCredit: u.ai_credit || 0,
     emailVerified: u.email_verified == null ? 1 : u.email_verified,
+    email: u.email || "", billingEmail: u.billing_email || "", address: u.address || "", phone: u.phone || "",
+    isSSO: !!u.provider,
   };
 };
 
@@ -312,6 +314,37 @@ app.get("/auth/verify", (req, res) => {
   store.deleteAuthToken(token);
   res.redirect("/play?verified=1");
 });
+// Update your own profile (name, contact email, billing email, address, phone).
+app.post("/auth/profile", (req, res) => {
+  const u = userFromReq(req);
+  if (!u) return res.status(401).json({ error: "Please log in." });
+  const name = String(req.body.name || "").trim();
+  const email = String(req.body.email || "").trim().toLowerCase();
+  const billingEmail = String(req.body.billingEmail || "").trim().toLowerCase();
+  const address = String(req.body.address || "").trim().slice(0, 300);
+  const phone = String(req.body.phone || "").trim().slice(0, 40);
+  if (!name) return res.status(400).json({ error: "Name can't be empty." });
+  if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: "Enter a valid email address." });
+  if (billingEmail && !/^\S+@\S+\.\S+$/.test(billingEmail)) return res.status(400).json({ error: "Enter a valid billing email (or leave it blank)." });
+  const other = store.getUserByEmail(email);
+  if (other && other.id !== u.id) return res.status(409).json({ error: "That email is already in use by another account." });
+  const emailChanged = (u.email || "").toLowerCase() !== email;
+  store.setProfile({ id: u.id, name, email, billing_email: billingEmail || null, address: address || null, phone: phone || null });
+  if (emailChanged && mailConfigured()) store.setEmailVerified(u.id, 0); // re-verify the new address
+  res.json({ user: pubUser(store.getUserById(u.id)) });
+});
+
+// Change your password (must know the current one).
+app.post("/auth/change-password", (req, res) => {
+  const u = userFromReq(req);
+  if (!u) return res.status(401).json({ error: "Please log in." });
+  const next = String(req.body.next || "");
+  if (next.length < 6) return res.status(400).json({ error: "New password must be at least 6 characters." });
+  if (!bcrypt.compareSync(String(req.body.current || ""), u.pass_hash)) return res.status(400).json({ error: "Your current password is incorrect." });
+  store.setUserPassword(u.id, bcrypt.hashSync(next, 10));
+  res.json({ ok: true });
+});
+
 app.post("/auth/resend-verify", (req, res) => {
   const u = userFromReq(req);
   if (!u) return res.status(401).json({ error: "Please log in first." });

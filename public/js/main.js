@@ -92,8 +92,47 @@ function openSettings() {
       socket.emit("setDice3d", d3.checked);
     };
   }
+  // Prefill the account fields.
+  const a = window.account || {};
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
+  set("acc-name", a.name); set("acc-email", a.email); set("acc-billing", a.billingEmail);
+  set("acc-address", a.address); set("acc-phone", a.phone);
+  document.getElementById("acc-msg").textContent = "";
+  document.getElementById("pw-msg").textContent = "";
+  // SSO-only accounts have no password to "change" with a current one.
+  document.getElementById("pw-block").style.display = a.isSSO ? "none" : "";
   settingsOverlay.classList.remove("hidden");
 }
+// Save account details.
+document.getElementById("acc-save")?.addEventListener("click", async () => {
+  const msg = document.getElementById("acc-msg");
+  msg.textContent = "Saving…";
+  try {
+    const { user } = await authPost("/auth/profile", {
+      name: document.getElementById("acc-name").value,
+      email: document.getElementById("acc-email").value,
+      billingEmail: document.getElementById("acc-billing").value,
+      address: document.getElementById("acc-address").value,
+      phone: document.getElementById("acc-phone").value,
+    });
+    window.account = user;
+    msg.textContent = "Saved ✓";
+  } catch (e) { msg.textContent = e.message; }
+});
+// Change password.
+document.getElementById("pw-save")?.addEventListener("click", async () => {
+  const msg = document.getElementById("pw-msg");
+  msg.textContent = "Updating…";
+  try {
+    await authPost("/auth/change-password", {
+      current: document.getElementById("pw-current").value,
+      next: document.getElementById("pw-new").value,
+    });
+    document.getElementById("pw-current").value = "";
+    document.getElementById("pw-new").value = "";
+    msg.textContent = "Password updated ✓";
+  } catch (e) { msg.textContent = e.message; }
+});
 
 initHelp(); // Help & Guide overlay (buttons exist on both the dashboard and the in-game top bar).
 initTooltips(); // Styled hover tooltips for every control (upgrades native titles).

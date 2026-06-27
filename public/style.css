@@ -548,6 +548,11 @@ body.table-display #tv-fullscreen:hover { opacity: 1; }
 .dice3d canvas { width: 100%; height: 100%; display: block; }
 .set-toggle { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--ink); margin: 4px 0 14px; line-height: 1.4; cursor: pointer; }
 .set-toggle input { margin-top: 2px; }
+/* Account fields in Settings */
+#settings-overlay .admin-card label { display: block; text-align: left; margin: 10px 0 4px; color: var(--ink); font-size: 13px; font-weight: 500; }
+#settings-overlay .admin-card input, #settings-overlay .admin-card textarea { width: 100%; }
+#settings-overlay #acc-save, #settings-overlay #pw-save { margin-top: 12px; }
+#acc-msg, #pw-msg { min-height: 16px; }
 
 /* Styled hover tooltips */
 .tooltip {

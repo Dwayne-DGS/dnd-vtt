@@ -101,12 +101,30 @@
   <div id="settings-overlay" class="admin-overlay hidden">
     <div class="admin-card">
       <h2>Settings</h2>
-      <h3 class="dash-h">Your dice</h3>
+
+      <h3 class="dash-h">Your account</h3>
+      <label>Name <input id="acc-name" /></label>
+      <label>Login email <input id="acc-email" type="email" /></label>
+      <label>Billing email <span class="muted" style="font-weight:400">(optional — for receipts; defaults to login email)</span> <input id="acc-billing" type="email" placeholder="same as login email" /></label>
+      <label>Mailing address <span class="muted" style="font-weight:400">(optional)</span> <textarea id="acc-address" rows="2" placeholder="Street, city, state, ZIP, country"></textarea></label>
+      <label>Phone <span class="muted" style="font-weight:400">(optional)</span> <input id="acc-phone" type="tel" /></label>
+      <button id="acc-save">Save account details</button>
+      <p id="acc-msg" class="join-hint"></p>
+
+      <h3 class="dash-h" style="margin-top:18px">Change password</h3>
+      <div id="pw-block">
+        <label>Current password <input id="pw-current" type="password" autocomplete="current-password" /></label>
+        <label>New password <input id="pw-new" type="password" autocomplete="new-password" placeholder="at least 6 characters" /></label>
+        <button id="pw-save">Update password</button>
+        <p id="pw-msg" class="join-hint"></p>
+      </div>
+
+      <h3 class="dash-h" style="margin-top:18px">Your dice</h3>
       <p class="join-hint">Pick a dice style. It's saved to your account and used wherever you roll.</p>
       <div id="skin-grid" class="skin-grid"></div>
       <h3 class="dash-h">Roll animation</h3>
       <label class="set-toggle"><input type="checkbox" id="set-dice3d" checked /> 3D physics dice (tumbling). Uncheck for the lighter 2D animation.</label>
-      <button id="settings-close" class="btn-secondary">Close</button>
+      <button id="settings-close" class="btn-secondary" style="margin-top:14px">Close</button>
     </div>
   </div>
 

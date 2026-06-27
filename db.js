@@ -131,6 +131,9 @@ if (userCols.length && !userCols.includes("ai_credit")) db.exec("ALTER TABLE use
 if (userCols.length && !userCols.includes("provider")) db.exec("ALTER TABLE users ADD COLUMN provider TEXT");        // SSO provider (google|discord)
 if (userCols.length && !userCols.includes("provider_id")) db.exec("ALTER TABLE users ADD COLUMN provider_id TEXT");  // the provider's user id
 if (userCols.length && !userCols.includes("email_verified")) db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 1"); // existing accounts treated as verified
+if (userCols.length && !userCols.includes("billing_email")) db.exec("ALTER TABLE users ADD COLUMN billing_email TEXT");
+if (userCols.length && !userCols.includes("address")) db.exec("ALTER TABLE users ADD COLUMN address TEXT");
+if (userCols.length && !userCols.includes("phone")) db.exec("ALTER TABLE users ADD COLUMN phone TEXT");
 // Short-lived tokens for password resets and email verification.
 db.exec(`CREATE TABLE IF NOT EXISTS auth_tokens (token TEXT PRIMARY KEY, user_id TEXT, kind TEXT, expires INTEGER)`);
 const tokenCols = db.prepare("PRAGMA table_info(tokens)").all().map((c) => c.name);
@@ -337,6 +340,8 @@ export function getUserByEmail(e) { return e ? _userByEmail.get(e) : null; }
 export function linkProvider(id, p, pid) { _linkProvider.run(p, String(pid), id); }
 export function usernameTaken(name) { return !!_userByName.get(name); }
 export function createOAuthUser(u) { _createOAuthUser.run({ name: null, email: null, created_at: Date.now(), ...u }); }
+const _setProfile = db.prepare("UPDATE users SET name=@name, email=@email, billing_email=@billing_email, address=@address, phone=@phone WHERE id=@id");
+export function setProfile(p) { _setProfile.run(p); }
 export function countUsers() { return _countUsers.get().n; }
 export function listUsers() { return _listUsers.all(); }
 export function setUserRole(id, role) { _setRole.run(role, id); }
