@@ -10,8 +10,36 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+  <!-- Auth screen (login / create account) -->
+  <div id="auth-screen" class="join-screen">
+    <div class="join-card">
+      <h1>⚔️ D&D Virtual Tabletop</h1>
+      <div class="mode-tabs">
+        <button id="auth-mode-login" class="mode-tab active">Log in</button>
+        <button id="auth-mode-signup" class="mode-tab">Create account</button>
+      </div>
+      <div id="login-form">
+        <label>Username <input id="login-user" autocomplete="username" /></label>
+        <label>Password <input id="login-pass" type="password" autocomplete="current-password" /></label>
+        <button id="login-btn">Log in</button>
+      </div>
+      <div id="signup-form" class="hidden">
+        <label>Username <input id="signup-user" placeholder="3–20 letters, numbers, _" /></label>
+        <label>Password <input id="signup-pass" type="password" placeholder="at least 6 characters" /></label>
+        <label>I want to…
+          <select id="signup-role">
+            <option value="player">Play in games (Player)</option>
+            <option value="gm">Run games (Game Master)</option>
+          </select>
+        </label>
+        <button id="signup-btn">Create account</button>
+      </div>
+      <p id="auth-error" class="auth-error"></p>
+    </div>
+  </div>
+
   <!-- Join screen -->
-  <div id="join-screen" class="join-screen">
+  <div id="join-screen" class="join-screen hidden">
     <div class="join-card">
       <h1>⚔️ D&D Virtual Tabletop</h1>
       <div class="mode-tabs">
@@ -21,7 +49,6 @@
 
       <!-- JOIN -->
       <div id="join-form">
-        <label>Your name <input id="join-name" placeholder="e.g. Dwayne" /></label>
         <label>Room <input id="join-room" placeholder="e.g. curse-of-strahd" /></label>
         <label>Password <input id="join-pw" type="password" placeholder="the table's password" /></label>
         <p class="join-hint">Enter the DM password to run the game, or the player password to play. Ask your DM for the table name &amp; password.</p>
@@ -30,7 +57,6 @@
 
       <!-- CREATE -->
       <div id="create-form" class="hidden">
-        <label>Your name <input id="create-name" placeholder="e.g. Dwayne" /></label>
         <label>Room name <input id="create-room" placeholder="e.g. curse-of-strahd" /></label>
         <label>DM password <input id="create-dm" type="password" placeholder="kept secret — makes you the DM" /></label>
         <label>Player password <input id="create-player" type="password" placeholder="optional — share with your players" /></label>
@@ -39,6 +65,7 @@
       </div>
 
       <button id="admin-link" class="link-btn">Manage rooms (owner)</button>
+      <button id="logout-join" class="link-btn">Log out</button>
     </div>
   </div>
 
@@ -68,12 +95,15 @@
         <button id="map-save" class="btn-secondary dm-only" title="Save this map URL to the library">★</button>
         <button id="map-upload" class="btn-secondary dm-only" title="Upload a map image from your computer">⬆ Map</button>
         <button id="map-rotate" class="btn-secondary dm-only" title="Rotate the map 90°">⟳</button>
+        <button id="logout-btn" class="btn-secondary" title="Log out">⎋ Log out</button>
         <button id="add-token" class="dm-only">+ Token</button>
         <button id="add-portrait" class="dm-only" title="Add a token with a portrait image">+ 📷</button>
         <button id="grid-toggle" class="btn-secondary dm-only" title="Overlay a grid (for maps without one)">⊞ Grid</button>
         <button id="grid-minus" class="btn-secondary dm-only" title="Smaller grid squares">−</button>
         <button id="grid-plus" class="btn-secondary dm-only" title="Larger grid squares">+</button>
         <button id="snap-toggle" class="btn-secondary" title="Snap tokens to the grid when you drop them">▦ Snap</button>
+        <button id="measure-toggle" class="btn-secondary" title="Measure distance: drag on the map (ft / squares)">📏 Measure</button>
+        <button id="view-reset" class="btn-secondary" title="Reset zoom &amp; pan">⟲ View</button>
         <button id="fog-toggle" class="btn-secondary dm-only" title="Turn fog of war on/off">🌫 Fog</button>
         <button id="fog-reveal" class="btn-secondary dm-only" title="Paint to reveal areas (drag on the map)">Reveal</button>
         <button id="fog-reset" class="btn-secondary dm-only" title="Hide the whole map again">Reset fog</button>
@@ -92,7 +122,7 @@
       <section class="map-wrap">
         <canvas id="map-canvas"></canvas>
         <div id="video-strip" class="video-strip hidden"></div>
-        <p class="hint">Drag tokens to move them. Double-click a token to remove it.</p>
+        <p class="hint">Scroll to zoom · drag empty space to pan · Alt-click to ping · drag a token to move it</p>
       </section>
 
       <aside class="sidebar">
@@ -202,6 +232,7 @@
 
   <div id="fx-flash" class="fx-flash"></div>
   <div id="sheet-modal" class="sheet-modal hidden"></div>
+  <div id="token-menu" class="token-menu hidden"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script type="module" src="/js/main.js"></script>

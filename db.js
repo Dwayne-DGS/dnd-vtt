@@ -45,6 +45,20 @@ db.exec(`
     name    TEXT,
     url     TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id         TEXT PRIMARY KEY,
+    username   TEXT UNIQUE NOT NULL,
+    pass_hash  TEXT NOT NULL,
+    role       TEXT NOT NULL,      -- 'admin' | 'gm' | 'player'
+    created_at INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    token      TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL,
+    created_at INTEGER
+  );
 `);
 
 // Migrations: add columns to existing databases that predate them.
@@ -59,9 +73,10 @@ if (!roomCols.includes("map_rotation")) db.exec("ALTER TABLE rooms ADD COLUMN ma
 if (!roomCols.includes("grid_on")) db.exec("ALTER TABLE rooms ADD COLUMN grid_on INTEGER DEFAULT 0");
 if (!roomCols.includes("grid_size")) db.exec("ALTER TABLE rooms ADD COLUMN grid_size INTEGER DEFAULT 64");
 const tokenCols = db.prepare("PRAGMA table_info(tokens)").all().map((c) => c.name);
-if (!tokenCols.includes("img")) {
-  db.exec("ALTER TABLE tokens ADD COLUMN img TEXT");
-}
+if (!tokenCols.includes("img")) db.exec("ALTER TABLE tokens ADD COLUMN img TEXT");
+if (!tokenCols.includes("hp")) db.exec("ALTER TABLE tokens ADD COLUMN hp INTEGER");
+if (!tokenCols.includes("hp_max")) db.exec("ALTER TABLE tokens ADD COLUMN hp_max INTEGER");
+if (!tokenCols.includes("size")) db.exec("ALTER TABLE tokens ADD COLUMN size REAL DEFAULT 1");
 
 // --- Rooms -----------------------------------------------------------------
 const _ensureRoom = db.prepare(
@@ -145,20 +160,29 @@ export const deleteRoom = db.transaction((roomId) => {
 // --- Tokens ----------------------------------------------------------------
 const _getTokens = db.prepare("SELECT * FROM tokens WHERE room_id = ?");
 const _upsertToken = db.prepare(`
-  INSERT INTO tokens (id, room_id, label, color, img, x, y)
-  VALUES (@id, @room_id, @label, @color, @img, @x, @y)
+  INSERT INTO tokens (id, room_id, label, color, img, hp, hp_max, size, x, y)
+  VALUES (@id, @room_id, @label, @color, @img, @hp, @hp_max, @size, @x, @y)
   ON CONFLICT(id) DO UPDATE SET
     label = excluded.label, color = excluded.color, img = excluded.img,
+    hp = excluded.hp, hp_max = excluded.hp_max, size = excluded.size,
     x = excluded.x, y = excluded.y
 `);
 const _moveToken = db.prepare("UPDATE tokens SET x = ?, y = ? WHERE id = ?");
+const _getToken = db.prepare("SELECT * FROM tokens WHERE id = ?");
+const _updateToken = db.prepare("UPDATE tokens SET label=@label, color=@color, hp=@hp, hp_max=@hp_max, size=@size WHERE id=@id");
 const _deleteToken = db.prepare("DELETE FROM tokens WHERE id = ?");
 
 export function getTokens(roomId) {
   return _getTokens.all(roomId);
 }
+export function getToken(id) {
+  return _getToken.get(id);
+}
 export function upsertToken(t) {
   _upsertToken.run(t);
+}
+export function updateTokenRow(t) {
+  _updateToken.run(t);
 }
 export function moveToken(id, x, y) {
   _moveToken.run(x, y, id);
@@ -220,5 +244,29 @@ export function saveMapEntry(id, roomId, name, url) {
 export function deleteMapEntry(id) {
   _deleteMapRow.run(id);
 }
+
+// --- Users & sessions ------------------------------------------------------
+const _createUser = db.prepare("INSERT INTO users (id, username, pass_hash, role, created_at) VALUES (@id, @username, @pass_hash, @role, @created_at)");
+const _userByName = db.prepare("SELECT * FROM users WHERE username = ?");
+const _userById = db.prepare("SELECT * FROM users WHERE id = ?");
+const _countUsers = db.prepare("SELECT COUNT(*) n FROM users");
+const _listUsers = db.prepare("SELECT id, username, role, created_at FROM users ORDER BY created_at");
+const _setRole = db.prepare("UPDATE users SET role = ? WHERE id = ?");
+const _delUser = db.prepare("DELETE FROM users WHERE id = ?");
+const _createSession = db.prepare("INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)");
+const _sessionUser = db.prepare("SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?");
+const _delSession = db.prepare("DELETE FROM sessions WHERE token = ?");
+const _delUserSessions = db.prepare("DELETE FROM sessions WHERE user_id = ?");
+
+export function createUser(u) { _createUser.run({ ...u, created_at: Date.now() }); }
+export function getUserByUsername(name) { return _userByName.get(name); }
+export function getUserById(id) { return _userById.get(id); }
+export function countUsers() { return _countUsers.get().n; }
+export function listUsers() { return _listUsers.all(); }
+export function setUserRole(id, role) { _setRole.run(role, id); }
+export function deleteUser(id) { _delUserSessions.run(id); _delUser.run(id); }
+export function createSession(token, userId) { _createSession.run(token, userId, Date.now()); }
+export function getSessionUser(token) { return token ? _sessionUser.get(token) : null; }
+export function deleteSession(token) { _delSession.run(token); }
 
 export default db;

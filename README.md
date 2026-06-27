@@ -8,8 +8,14 @@ the same **room** shares one game in real time:
   optional **grid snapping**, and **rotate** the map in 90° steps. Moves appear
   instantly for every player. **Shared map library:** saved maps are available in
   every room — upload once, reuse in any campaign.
+- **Zoom, pan & ruler** — scroll to zoom, drag empty space to pan, and a measure
+  tool that reports distance in feet / squares. Alt-click to **ping** a spot for
+  everyone. Tokens show name labels + HP bars, can be resized (1×1–3×3), and have a
+  DM right-click menu (rename, set HP, resize, remove).
 - **Fog of war** — the DM toggles fog on, then paints to reveal areas as the party
   explores. Players see hidden areas blacked out; the DM sees them dimmed.
+- **Combat highlight** — the active combatant in the initiative tracker gets a
+  glowing ring on their map token.
 - **Bestiary → map** — place any saved creature onto the map as a token in one click.
 - **Dice roller** — quick buttons (d20, d12, …) plus full notation like `2d6+3`
   or `3d10+2d4+1`. Rolls are broadcast to the whole table.
@@ -174,6 +180,22 @@ the default is `claude-sonnet-4-6`. If `claude.key` is absent, the AI tab simply
 reports it isn't set up. Players can create their own characters and ask rules
 questions; monsters/NPCs and encounter ideas are DM-only. Requests are
 rate-limited per person.
+
+---
+
+## Accounts & login
+
+The whole app is gated behind a login. Visitors **create an account** (username +
+password — hashed with bcrypt, stored in the database; sessions via a secure
+cookie). At sign-up they choose a role:
+
+- **Game Master** — can create tables (and is the DM of tables they create).
+- **Player** — can join tables but not create them.
+- The **very first account created becomes the system admin**.
+
+No third-party service, no configuration, no cost — it's all in-house. To promote
+or change an account's role manually you can edit the `users` table, or we can add
+an admin screen for it later.
 
 ---
 

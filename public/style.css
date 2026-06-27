@@ -115,6 +115,8 @@ select { cursor: pointer; }
 .mode-tab { flex: 1; background: transparent; color: var(--muted); border: none; box-shadow: none; padding: 9px; }
 .mode-tab.active { background: linear-gradient(180deg, var(--accent), var(--accent-d)); color: #fff; }
 .join-hint { color: var(--muted); font-size: 12px; text-align: left; margin: 10px 0 0; line-height: 1.5; }
+.auth-error { color: #e89b9b; font-size: 13px; min-height: 16px; margin: 12px 0 0; }
+#auth-screen .join-card label select { width: 100%; margin-top: 4px; }
 .link-btn { background: transparent; color: var(--muted); border: none; box-shadow: none; font-size: 12px; text-decoration: underline; margin-top: 16px; padding: 4px; font-weight: 500; }
 .link-btn:hover { color: var(--gold-2); filter: none; }
 
@@ -154,6 +156,11 @@ select { cursor: pointer; }
   background: rgba(15,11,7,0.6); padding: 4px 10px; border-radius: 999px;
   backdrop-filter: blur(4px);
 }
+
+/* Token right-click menu */
+.token-menu { position: fixed; z-index: 95; background: var(--panel); border: 1px solid var(--border-2); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 5px; display: flex; flex-direction: column; min-width: 150px; }
+.token-menu button { background: transparent; color: var(--ink); border: none; box-shadow: none; text-align: left; padding: 8px 10px; border-radius: 6px; font-weight: 500; }
+.token-menu button:hover { background: var(--panel-3); filter: none; }
 
 /* Voice/video tiles */
 .video-strip { position: absolute; top: 12px; left: 12px; z-index: 5; display: flex; gap: 8px; flex-wrap: wrap; max-width: 70%; }

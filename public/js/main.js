@@ -13,8 +13,74 @@ import { initAI } from "./ai.js";
 
 const socket = io({ autoConnect: false });
 
+const authScreen = document.getElementById("auth-screen");
 const joinScreen = document.getElementById("join-screen");
 const app = document.getElementById("app");
+
+// --- Account gate --------------------------------------------------------
+window.account = null;
+
+function showAuth() {
+  authScreen.classList.remove("hidden");
+  joinScreen.classList.add("hidden");
+  app.classList.add("hidden");
+}
+function showLanding(user) {
+  window.account = user;
+  authScreen.classList.add("hidden");
+  joinScreen.classList.remove("hidden");
+  // Only GMs / admins may create tables.
+  const canCreate = user.role === "gm" || user.role === "admin";
+  document.getElementById("mode-create").classList.toggle("hidden", !canCreate);
+  if (!canCreate) document.getElementById("mode-join").click();
+}
+async function authPost(path, body) {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "Something went wrong.");
+  return j;
+}
+function logout() { fetch("/auth/logout", { method: "POST" }).then(() => location.reload()); }
+
+// Auth screen tabs
+const loginForm = document.getElementById("login-form");
+const signupForm = document.getElementById("signup-form");
+const authErr = document.getElementById("auth-error");
+document.getElementById("auth-mode-login").addEventListener("click", (e) => {
+  e.target.classList.add("active"); document.getElementById("auth-mode-signup").classList.remove("active");
+  loginForm.classList.remove("hidden"); signupForm.classList.add("hidden"); authErr.textContent = "";
+});
+document.getElementById("auth-mode-signup").addEventListener("click", (e) => {
+  e.target.classList.add("active"); document.getElementById("auth-mode-login").classList.remove("active");
+  signupForm.classList.remove("hidden"); loginForm.classList.add("hidden"); authErr.textContent = "";
+});
+document.getElementById("login-btn").addEventListener("click", async () => {
+  authErr.textContent = "";
+  try {
+    const { user } = await authPost("/auth/login", {
+      username: document.getElementById("login-user").value,
+      password: document.getElementById("login-pass").value,
+    });
+    showLanding(user);
+  } catch (e) { authErr.textContent = e.message; }
+});
+document.getElementById("signup-btn").addEventListener("click", async () => {
+  authErr.textContent = "";
+  try {
+    const { user } = await authPost("/auth/signup", {
+      username: document.getElementById("signup-user").value,
+      password: document.getElementById("signup-pass").value,
+      role: document.getElementById("signup-role").value,
+    });
+    showLanding(user);
+  } catch (e) { authErr.textContent = e.message; }
+});
+document.getElementById("login-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("login-btn").click(); });
+document.getElementById("logout-join").addEventListener("click", logout);
+document.getElementById("logout-btn").addEventListener("click", logout);
+
+// On load, find out if we're already logged in.
+fetch("/auth/me").then((r) => r.json()).then(({ user }) => { if (user) showLanding(user); else showAuth(); }).catch(showAuth);
 
 // Role is decided by the server from the DM password. We mirror it to the body
 // class (CSS hides .dm-only controls for players) and to window.isDM /
@@ -55,22 +121,20 @@ modeCreate.addEventListener("click", () => {
 });
 
 function doJoin() {
-  const name = document.getElementById("join-name").value.trim() || "Player";
   const room = document.getElementById("join-room").value.trim();
   const password = document.getElementById("join-pw").value;
   if (!room) { alert("Enter the table (room) name."); return; }
   socket.connect();
-  socket.emit("join", { name, room, password });
+  socket.emit("join", { room, password });
 }
 function doCreate() {
-  const name = document.getElementById("create-name").value.trim() || "DM";
   const room = document.getElementById("create-room").value.trim();
   const dmPassword = document.getElementById("create-dm").value;
   const playerPassword = document.getElementById("create-player").value;
   if (!room) { alert("Enter a room name."); return; }
   if (!dmPassword) { alert("Set a DM password to create a table."); return; }
   socket.connect();
-  socket.emit("createRoom", { name, room, dmPassword, playerPassword });
+  socket.emit("createRoom", { room, dmPassword, playerPassword });
 }
 document.getElementById("join-btn").addEventListener("click", doJoin);
 document.getElementById("join-pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doJoin(); });

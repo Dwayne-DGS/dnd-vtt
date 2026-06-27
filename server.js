@@ -6,8 +6,9 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { randomUUID } from "crypto";
+import { randomUUID, randomBytes } from "crypto";
 import { createWriteStream, mkdirSync, readFileSync, existsSync } from "fs";
+import bcrypt from "bcryptjs";
 import { rollDice } from "./dice.js";
 import * as store from "./db.js";
 
@@ -29,8 +30,58 @@ function adminPassword() {
   } catch { return null; }
 }
 
+app.use(express.json()); // parses application/json bodies (not the image uploads)
 app.use(express.static(join(__dirname, "public")));
 app.get("/health", (_req, res) => res.json({ ok: true }));
+
+// --- Accounts (username/password, in-house) -------------------------------
+function parseCookies(str) {
+  const out = {};
+  (str || "").split(";").forEach((p) => { const i = p.indexOf("="); if (i > 0) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim()); });
+  return out;
+}
+function setSessionCookie(res, token) {
+  res.setHeader("Set-Cookie", `vtt_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`);
+}
+function userFromReq(req) { return store.getSessionUser(parseCookies(req.headers.cookie)["vtt_session"]); }
+const pubUser = (u) => (u ? { username: u.username, role: u.role } : null);
+
+app.post("/auth/signup", (req, res) => {
+  const username = String(req.body.username || "").trim().toLowerCase();
+  const password = String(req.body.password || "");
+  const role = req.body.role === "gm" ? "gm" : "player";
+  if (!/^[a-z0-9_]{3,20}$/.test(username)) return res.status(400).json({ error: "Username: 3–20 letters, numbers, or underscores." });
+  if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters." });
+  if (store.getUserByUsername(username)) return res.status(409).json({ error: "That username is taken." });
+  const finalRole = store.countUsers() === 0 ? "admin" : role; // first account = system admin
+  const id = randomUUID();
+  store.createUser({ id, username, pass_hash: bcrypt.hashSync(password, 10), role: finalRole });
+  const token = randomBytes(32).toString("hex");
+  store.createSession(token, id);
+  setSessionCookie(res, token);
+  res.json({ user: { username, role: finalRole } });
+});
+
+app.post("/auth/login", (req, res) => {
+  const username = String(req.body.username || "").trim().toLowerCase();
+  const u = store.getUserByUsername(username);
+  if (!u || !bcrypt.compareSync(String(req.body.password || ""), u.pass_hash)) {
+    return res.status(401).json({ error: "Wrong username or password." });
+  }
+  const token = randomBytes(32).toString("hex");
+  store.createSession(token, u.id);
+  setSessionCookie(res, token);
+  res.json({ user: pubUser(u) });
+});
+
+app.post("/auth/logout", (req, res) => {
+  const t = parseCookies(req.headers.cookie)["vtt_session"];
+  if (t) store.deleteSession(t);
+  res.setHeader("Set-Cookie", "vtt_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0");
+  res.json({ ok: true });
+});
+
+app.get("/auth/me", (req, res) => res.json({ user: pubUser(userFromReq(req)) }));
 
 // Image upload (maps & token portraits). Streams the raw request body to a file
 // under public/uploads and returns its public URL. Image types only, size-capped.
@@ -121,6 +172,8 @@ function sortInit(state) {
 io.on("connection", (socket) => {
   let roomId = null;
   const amDM = () => dmFlags.get(socket.id) === true;
+  // Identify the logged-in account from the session cookie sent with the handshake.
+  socket.user = store.getSessionUser(parseCookies(socket.handshake.headers.cookie)["vtt_session"]);
 
   function sendState() {
     socket.emit("state", {
@@ -141,8 +194,12 @@ io.on("connection", (socket) => {
   // Create a brand-new table: the DM names it and sets both passwords. The
   // creator becomes the DM. Fails if the room name is already taken.
   socket.on("createRoom", ({ room, name, dmPassword, playerPassword }) => {
+    if (!socket.user) return socket.emit("joinError", "Please log in first.");
+    if (!["gm", "admin"].includes(socket.user.role)) {
+      return socket.emit("joinError", "Only Game Master accounts can create tables.");
+    }
     roomId = (room || "").trim().toLowerCase();
-    const pname = (name || "DM").trim();
+    const pname = socket.user.username;
     const dpw = (dmPassword || "").trim();
     if (!roomId) return socket.emit("joinError", "Please enter a room name.");
     if (!dpw) return socket.emit("joinError", "A DM password is required to create a room.");
@@ -166,8 +223,9 @@ io.on("connection", (socket) => {
   // password makes you DM; matching the player password (or any password if the
   // room has none) joins you as a player.
   socket.on("join", ({ room, name, password }) => {
+    if (!socket.user) return socket.emit("joinError", "Please log in first.");
     roomId = (room || "").trim().toLowerCase();
-    const pname = (name || "Player").trim();
+    const pname = socket.user.username;
     if (!roomId) return socket.emit("joinError", "Please enter a room name.");
     const roomRow = store.getRoom(roomId);
     if (!roomRow) {
@@ -322,6 +380,7 @@ io.on("connection", (socket) => {
       label: label || "?",
       color: color || "#c0392b",
       img: img || null,
+      hp: null, hp_max: null, size: 1,
       x: 60,
       y: 60,
     };
@@ -336,10 +395,33 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("tokenMoved", { id, x, y });
   });
 
+  socket.on("updateToken", ({ id, label, color, hp, hpMax, size }) => {
+    if (!roomId || !amDM()) return;
+    const cur = store.getToken(id);
+    if (!cur) return;
+    const row = {
+      id,
+      label: label ?? cur.label,
+      color: color ?? cur.color,
+      hp: hp === undefined ? cur.hp : hp,
+      hp_max: hpMax === undefined ? cur.hp_max : hpMax,
+      size: size ?? cur.size ?? 1,
+    };
+    store.updateTokenRow(row);
+    io.to(roomId).emit("tokenUpdated", { id, label: row.label, color: row.color, hp: row.hp, hp_max: row.hp_max, size: row.size });
+  });
+
   socket.on("deleteToken", (id) => {
     if (!roomId || !amDM()) return;
     store.deleteToken(id);
     io.to(roomId).emit("tokenDeleted", id);
+  });
+
+  // Pings — anyone can drop a "look here" marker; coordinates are normalized to
+  // the map so they land on the same spot for everyone regardless of zoom/screen.
+  socket.on("ping", ({ nx, ny }) => {
+    if (!roomId || typeof nx !== "number" || typeof ny !== "number") return;
+    io.to(roomId).emit("ping", { nx, ny });
   });
 
   // --- Dice + chat ---------------------------------------------------------
