@@ -17,6 +17,13 @@ function dieSVG(type, content) {
   return `<svg viewBox="0 0 100 100" class="die-svg"><polygon points="${SHAPES[type]}"/><text x="50" y="58" text-anchor="middle" class="die-num">${content}</text></svg>`;
 }
 
+// Small icon (no number) for chat — maps a die's sides to the right shape.
+const SIDES_TO_TYPE = { 4: "d4", 6: "d6", 8: "d8", 10: "d10", 12: "d12", 20: "d20", 100: "d10" };
+export function dieIconHTML(sides) {
+  const type = SIDES_TO_TYPE[sides] || "d20";
+  return `<svg viewBox="0 0 100 100" class="die-mini"><polygon points="${SHAPES[type]}"/></svg>`;
+}
+
 export function initDice(socket) {
   const bar = document.getElementById("dice-bar");
   const overlay = document.getElementById("dice-anim");

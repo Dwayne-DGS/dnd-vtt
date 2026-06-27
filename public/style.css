@@ -202,7 +202,10 @@ select { cursor: pointer; }
 .msg { padding: 8px 11px; border-radius: var(--radius); background: var(--panel-2); font-size: 14px; border: 1px solid var(--border); }
 .msg .who { font-weight: 700; color: var(--gold-2); }
 .msg.system { background: transparent; border: none; color: var(--muted); font-style: italic; text-align: center; font-size: 12.5px; }
-.msg.roll { border-left: 3px solid var(--accent); background: linear-gradient(180deg, var(--panel-2), var(--panel)); }
+.msg.roll { border-left: 3px solid var(--accent); background: linear-gradient(180deg, var(--panel-2), var(--panel)); display: flex; align-items: flex-start; gap: 8px; }
+.msg.roll .roll-body { flex: 1; }
+.die-mini { width: 24px; height: 24px; flex: 0 0 auto; margin-top: 1px; }
+.die-mini polygon { fill: var(--panel-3); stroke: var(--gold); stroke-width: 6; stroke-linejoin: round; }
 .msg.roll .total { font-weight: 800; font-size: 17px; color: var(--gold-2); }
 .msg .detail { color: var(--muted); font-size: 12px; margin-top: 2px; }
 .dice-bar { display: flex; gap: 6px; margin: 12px 0; flex-wrap: wrap; }

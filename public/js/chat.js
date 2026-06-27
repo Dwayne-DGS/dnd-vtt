@@ -1,6 +1,8 @@
 // Chat log + dice. Typing something like "2d6+3" in the box rolls it;
 // anything else is sent as a chat message. The quick-dice buttons roll a single die.
 
+import { dieIconHTML } from "./dice.js";
+
 export function initChat(socket) {
   const log = document.getElementById("chat-log");
   const input = document.getElementById("chat-text");
@@ -16,10 +18,14 @@ export function initChat(socket) {
       div.textContent = m.text;
     } else if (m.type === "roll") {
       div.className = "msg roll";
+      // Pick the die icon from the rolled notation (first dN found; default d20).
+      const note = (m.text.match(/rolled\s+(\S+)/) || [])[1] || "";
+      const sides = parseInt((note.match(/d(\d+)/) || [])[1] || "20", 10);
       div.innerHTML =
-        `<span class="who">${esc(m.who)}</span> ${esc(m.text.split("=")[0])}` +
+        dieIconHTML(sides) +
+        `<div class="roll-body"><span class="who">${esc(m.who)}</span> ${esc(m.text.split("=")[0])}` +
         `= <span class="total">${esc(m.text.split("=")[1] || "")}</span>` +
-        `<div class="detail">${esc(m.detail || "")}</div>`;
+        `<div class="detail">${esc(m.detail || "")}</div></div>`;
     } else {
       div.className = "msg";
       div.innerHTML = `<span class="who">${esc(m.who)}:</span> ${esc(m.text)}`;
