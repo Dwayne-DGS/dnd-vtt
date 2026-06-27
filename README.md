@@ -193,9 +193,22 @@ cookie). At sign-up they choose a role:
 - **Player** — can join tables but not create them.
 - The **very first account created becomes the system admin**.
 
-No third-party service, no configuration, no cost — it's all in-house. To promote
-or change an account's role manually you can edit the `users` table, or we can add
-an admin screen for it later.
+No third-party service, no configuration, no cost — it's all in-house.
+
+**Manage accounts:** an admin sees a **"Manage accounts (admin)"** link on the
+landing screen — list everyone, change roles (Player/GM/Admin), or remove accounts.
+The last admin can't be demoted or deleted (so you never lock yourself out).
+
+**Make yourself admin (on the server):** the first account created is admin
+automatically. If the database already has accounts, promote yourself from the
+server shell:
+
+```bash
+cd /opt/dnd-vtt
+node make-admin.js yourusername              # promote an existing account
+# or create a fresh admin account:
+node make-admin.js yourusername yourpassword
+```
 
 ---
 

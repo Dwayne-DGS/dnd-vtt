@@ -33,6 +33,7 @@ function showLanding(user) {
   const canCreate = user.role === "gm" || user.role === "admin";
   document.getElementById("mode-create").classList.toggle("hidden", !canCreate);
   if (!canCreate) document.getElementById("mode-join").click();
+  document.getElementById("accounts-link").classList.toggle("hidden", user.role !== "admin");
 }
 async function authPost(path, body) {
   const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -78,6 +79,36 @@ document.getElementById("signup-btn").addEventListener("click", async () => {
 document.getElementById("login-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("login-btn").click(); });
 document.getElementById("logout-join").addEventListener("click", logout);
 document.getElementById("logout-btn").addEventListener("click", logout);
+
+// --- Account management (admin) -----------------------------------------
+const accountsOverlay = document.getElementById("accounts-overlay");
+const accountsListEl = document.getElementById("accounts-list");
+document.getElementById("accounts-link").addEventListener("click", () => { socket.connect(); socket.emit("adminUsers"); });
+document.getElementById("accounts-close").addEventListener("click", () => accountsOverlay.classList.add("hidden"));
+socket.on("adminUserList", (users) => {
+  accountsListEl.innerHTML = "";
+  const fmtDate = (ts) => (ts ? new Date(ts).toLocaleDateString() : "—");
+  users.forEach((u) => {
+    const row = document.createElement("div");
+    row.className = "admin-room";
+    row.innerHTML = `
+      <div style="flex:1">
+        <div class="ar-name">${escAcct(u.username)}</div>
+        <div class="ar-meta">joined ${fmtDate(u.created_at)}</div>
+      </div>
+      <select class="acct-role">
+        <option value="player"${u.role === "player" ? " selected" : ""}>Player</option>
+        <option value="gm"${u.role === "gm" ? " selected" : ""}>Game Master</option>
+        <option value="admin"${u.role === "admin" ? " selected" : ""}>Admin</option>
+      </select>
+      <button>Delete</button>`;
+    row.querySelector(".acct-role").addEventListener("change", (e) => socket.emit("adminSetRole", { id: u.id, role: e.target.value }));
+    row.querySelector("button").addEventListener("click", () => { if (confirm(`Delete account "${u.username}"?`)) socket.emit("adminDeleteUser", u.id); });
+    accountsListEl.appendChild(row);
+  });
+  accountsOverlay.classList.remove("hidden");
+});
+function escAcct(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
 // On load, find out if we're already logged in.
 fetch("/auth/me").then((r) => r.json()).then(({ user }) => { if (user) showLanding(user); else showAuth(); }).catch(showAuth);

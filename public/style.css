@@ -330,6 +330,7 @@ body.is-player .player-note { display: block; }
 .admin-room .ar-name { flex: 1; font-weight: 600; }
 .admin-room .ar-meta { font-size: 11px; color: var(--muted); }
 .admin-room button { background: linear-gradient(180deg, #b03636, #8c2727); padding: 5px 11px; font-size: 12px; }
+.admin-room .acct-role { padding: 6px 8px; font-size: 13px; }
 
 /* ============================================================
    Permission gating + animations

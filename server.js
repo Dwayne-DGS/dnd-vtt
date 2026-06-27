@@ -303,6 +303,33 @@ io.on("connection", (socket) => {
     }
   });
 
+  // --- Account management (system admin role) ------------------------------
+  const isAdmin = () => socket.user && socket.user.role === "admin";
+  const adminCount = () => store.listUsers().filter((u) => u.role === "admin").length;
+  socket.on("adminUsers", () => {
+    if (!isAdmin()) return socket.emit("adminError", "Admins only.");
+    socket.emit("adminUserList", store.listUsers());
+  });
+  socket.on("adminSetRole", ({ id, role }) => {
+    if (!isAdmin() || !["player", "gm", "admin"].includes(role)) return;
+    const target = store.getUserById(id);
+    if (!target) return;
+    if (target.role === "admin" && role !== "admin" && adminCount() <= 1)
+      return socket.emit("adminError", "Can't remove the last admin.");
+    store.setUserRole(id, role);
+    socket.emit("adminUserList", store.listUsers());
+  });
+  socket.on("adminDeleteUser", (id) => {
+    if (!isAdmin()) return;
+    if (id === socket.user.id) return socket.emit("adminError", "You can't delete your own account here.");
+    const target = store.getUserById(id);
+    if (!target) return;
+    if (target.role === "admin" && adminCount() <= 1)
+      return socket.emit("adminError", "Can't delete the last admin.");
+    store.deleteUser(id);
+    socket.emit("adminUserList", store.listUsers());
+  });
+
   // --- Owner room management (admin.key password) --------------------------
   function checkAdmin(pw) {
     const real = adminPassword();

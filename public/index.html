@@ -64,8 +64,19 @@
         <button id="create-btn">Create table</button>
       </div>
 
+      <button id="accounts-link" class="link-btn hidden">Manage accounts (admin)</button>
       <button id="admin-link" class="link-btn">Manage rooms (owner)</button>
       <button id="logout-join" class="link-btn">Log out</button>
+    </div>
+  </div>
+
+  <!-- Account-management overlay (system admin) -->
+  <div id="accounts-overlay" class="admin-overlay hidden">
+    <div class="admin-card">
+      <h2>Manage accounts</h2>
+      <p class="join-hint">Change a member's role or remove their account.</p>
+      <div id="accounts-list" class="admin-list"></div>
+      <button id="accounts-close" class="btn-secondary">Close</button>
     </div>
   </div>
 
