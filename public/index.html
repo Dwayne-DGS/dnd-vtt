@@ -136,9 +136,27 @@
         </div>
       </div>
       <div class="map-controls">
+        <button id="mute-btn" class="btn-secondary" title="Mute sounds">🔊</button>
+        <button id="help-btn" class="btn-secondary" title="Help &amp; guide">❔ Help</button>
+        <button id="logout-btn" class="btn-secondary" title="Log out">⎋ Log out</button>
+
+        <input type="file" id="handout-file" accept="image/*" hidden />
+        <input type="file" id="map-file" accept="image/*" hidden />
+        <input type="file" id="portrait-file" accept="image/*" hidden />
+        <span class="voice-controls">
+          <button id="voice-join" title="Start voice/video chat">🎤 Join voice</button>
+          <button id="voice-mute" class="btn-secondary hidden">🔇 Mute</button>
+          <button id="voice-cam" class="btn-secondary hidden">📷 Cam off</button>
+          <button id="voice-leave" class="hidden">Leave</button>
+        </span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <div class="tool-rail">
         <!-- 🗺 Map -->
         <div class="menu dm-only">
-          <button class="menu-trigger btn-secondary" type="button" data-tip="Set the battle map, save maps, rotate, and the grid">🗺 Map ▾</button>
+          <button class="menu-trigger rail-btn" type="button" data-tip="Map: set, save, rotate &amp; grid">🗺</button>
           <div class="menu-panel">
             <div class="menu-label">Saved maps</div>
             <div class="menu-row">
@@ -163,7 +181,7 @@
         </div>
         <!-- 🧩 Tokens -->
         <div class="menu dm-only">
-          <button class="menu-trigger btn-secondary" type="button" data-tip="Add tokens (figures) to the map">🧩 Tokens ▾</button>
+          <button class="menu-trigger rail-btn" type="button" data-tip="Tokens: add figures to the map">🧩</button>
           <div class="menu-panel">
             <div class="menu-row">
               <button id="add-token">+ Token</button>
@@ -173,7 +191,7 @@
         </div>
         <!-- 🌫 Fog -->
         <div class="menu dm-only">
-          <button class="menu-trigger btn-secondary" type="button" data-tip="Hide the map and reveal areas as players explore">🌫 Fog ▾</button>
+          <button class="menu-trigger rail-btn" type="button" data-tip="Fog of war: hide &amp; reveal the map">🌫</button>
           <div class="menu-panel">
             <div class="menu-row">
               <button id="fog-toggle" class="btn-secondary" title="Turn fog of war on/off">🌫 Fog on/off</button>
@@ -182,9 +200,9 @@
             </div>
           </div>
         </div>
-        <!-- 🎨 Draw & weather -->
+        <!-- 🎨 Draw -->
         <div class="menu dm-only">
-          <button class="menu-trigger btn-secondary" type="button" data-tip="Draw on the map and place spell templates">🎨 Draw ▾</button>
+          <button class="menu-trigger rail-btn" type="button" data-tip="Draw &amp; spell templates">🎨</button>
           <div class="menu-panel">
             <div class="menu-row">
               <button id="draw-toggle" class="btn-secondary" title="Freehand draw on the map">✏️ Draw</button>
@@ -199,7 +217,7 @@
         </div>
         <!-- 🌦 Weather -->
         <div class="menu dm-only">
-          <button class="menu-trigger btn-secondary" type="button" data-tip="Overlay rain, snow, or mist on the map">🌦 Weather ▾</button>
+          <button class="menu-trigger rail-btn" type="button" data-tip="Weather: rain, snow, or mist">🌦</button>
           <div class="menu-panel">
             <div class="menu-label">Weather</div>
             <select id="weather-select" title="Weather">
@@ -209,7 +227,7 @@
         </div>
         <!-- 💡 Lighting -->
         <div class="menu dm-only">
-          <button class="menu-trigger btn-secondary" type="button" data-tip="Walls and light sources for dynamic lighting / line-of-sight">💡 Lighting ▾</button>
+          <button class="menu-trigger rail-btn" type="button" data-tip="Dynamic lighting &amp; line-of-sight">💡</button>
           <div class="menu-panel">
             <div class="menu-row">
               <button id="wall-toggle" class="btn-secondary" title="Draw light-blocking walls (drag)">🧱 Walls</button>
@@ -221,7 +239,7 @@
         </div>
         <!-- 🎭 Table -->
         <div class="menu dm-only">
-          <button class="menu-trigger btn-secondary" type="button" data-tip="Manage who can join, and show handouts to players">🎭 Table ▾</button>
+          <button class="menu-trigger rail-btn" type="button" data-tip="Table: players &amp; handouts">🎭</button>
           <div class="menu-panel">
             <div class="menu-row">
               <button id="players-btn" class="btn-secondary" title="Manage who can join this table">👥 Players</button>
@@ -229,29 +247,13 @@
             </div>
           </div>
         </div>
+
+        <div class="rail-sep"></div>
         <!-- View tools (everyone) -->
-        <button id="snap-toggle" class="btn-secondary" title="Snap tokens to the grid when you drop them">▦ Snap</button>
-        <button id="measure-toggle" class="btn-secondary" title="Measure distance: drag on the map (ft / squares)">📏 Measure</button>
-        <button id="view-reset" class="btn-secondary" title="Reset zoom &amp; pan">⟲ View</button>
-
-        <span class="topbar-spacer"></span>
-        <button id="mute-btn" class="btn-secondary" title="Mute sounds">🔊</button>
-        <button id="help-btn" class="btn-secondary" title="Help &amp; guide">❔ Help</button>
-        <button id="logout-btn" class="btn-secondary" title="Log out">⎋ Log out</button>
-
-        <input type="file" id="handout-file" accept="image/*" hidden />
-        <input type="file" id="map-file" accept="image/*" hidden />
-        <input type="file" id="portrait-file" accept="image/*" hidden />
-        <span class="voice-controls">
-          <button id="voice-join" title="Start voice/video chat">🎤 Join voice</button>
-          <button id="voice-mute" class="btn-secondary hidden">🔇 Mute</button>
-          <button id="voice-cam" class="btn-secondary hidden">📷 Cam off</button>
-          <button id="voice-leave" class="hidden">Leave</button>
-        </span>
+        <button id="snap-toggle" class="rail-btn" data-tip="Snap tokens to the grid when dropped">▦</button>
+        <button id="measure-toggle" class="rail-btn" data-tip="Measure distance — drag on the map">📏</button>
+        <button id="view-reset" class="rail-btn" data-tip="Reset zoom &amp; pan">⟲</button>
       </div>
-    </header>
-
-    <main class="layout">
       <section class="map-wrap">
         <canvas id="map-canvas"></canvas>
         <canvas id="weather-canvas" class="weather-canvas hidden"></canvas>
