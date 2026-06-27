@@ -143,8 +143,13 @@ const voiceRooms = new Map(); // roomId -> Set<socketId>
 
 // Ephemeral map annotations per room: freehand drawings, area templates, weather.
 const annotations = new Map(); // roomId -> { drawings:[], templates:[], weather:"none" }
+const timers = new Map(); // roomId -> { running, endsAt, duration, label }
+function getTimer(roomId) {
+  if (!timers.has(roomId)) timers.set(roomId, { running: false, endsAt: 0, duration: 60, label: "" });
+  return timers.get(roomId);
+}
 function getAnno(roomId) {
-  if (!annotations.has(roomId)) annotations.set(roomId, { drawings: [], templates: [], weather: "none" });
+  if (!annotations.has(roomId)) annotations.set(roomId, { drawings: [], templates: [], weather: "none", walls: [], lights: [], lightingOn: false });
   return annotations.get(roomId);
 }
 
@@ -205,6 +210,10 @@ io.on("connection", (socket) => {
       initiative: getInit(roomId),
       fog: fogPayload(roomId),
       anno: getAnno(roomId),
+      journal: store.listJournal(roomId).filter((e) => amDM() || e.shared),
+      loot: store.listLoot(roomId),
+      gold: store.getPartyGold(roomId),
+      timer: getTimer(roomId),
     });
   }
 
@@ -327,6 +336,62 @@ io.on("connection", (socket) => {
     const weather = ["none", "rain", "snow", "fog"].includes(w) ? w : "none";
     getAnno(roomId).weather = weather;
     io.to(roomId).emit("weather", weather);
+  });
+
+  // --- Dynamic lighting / line-of-sight (DM) -------------------------------
+  socket.on("addWall", (wall) => { if (!roomId || !amDM() || !wall) return; getAnno(roomId).walls.push(wall); io.to(roomId).emit("addWall", wall); });
+  socket.on("clearWalls", () => { if (!roomId || !amDM()) return; getAnno(roomId).walls = []; io.to(roomId).emit("clearWalls"); });
+  socket.on("addLight", (light) => { if (!roomId || !amDM() || !light) return; getAnno(roomId).lights.push(light); io.to(roomId).emit("addLight", light); });
+  socket.on("clearLights", () => { if (!roomId || !amDM()) return; getAnno(roomId).lights = []; io.to(roomId).emit("clearLights"); });
+  socket.on("setLighting", (on) => { if (!roomId || !amDM()) return; getAnno(roomId).lightingOn = !!on; io.to(roomId).emit("lighting", !!on); });
+
+  // --- Journal / session notes (DM authors; players see "shared" ones) -----
+  async function broadcastJournal(rid) {
+    const all = store.listJournal(rid);
+    const shared = all.filter((e) => e.shared);
+    const sockets = await io.in(rid).fetchSockets();
+    for (const s of sockets) s.emit("journal", dmFlags.get(s.id) === true ? all : shared);
+  }
+  socket.on("saveJournal", async (e) => {
+    if (!roomId || !amDM() || !e) return;
+    store.upsertJournal({ id: e.id || randomUUID(), roomId, title: e.title, body: e.body, shared: e.shared });
+    await broadcastJournal(roomId);
+  });
+  socket.on("deleteJournal", async (id) => {
+    if (!roomId || !amDM()) return;
+    store.deleteJournal(id);
+    await broadcastJournal(roomId);
+  });
+
+  // --- Party loot (DM manages; everyone sees) ------------------------------
+  socket.on("saveLoot", (it) => {
+    if (!roomId || !amDM() || !it) return;
+    store.upsertLoot({ id: it.id || randomUUID(), roomId, name: it.name, qty: it.qty, value: it.value, holder: it.holder, notes: it.notes });
+    io.to(roomId).emit("loot", store.listLoot(roomId));
+  });
+  socket.on("deleteLoot", (id) => {
+    if (!roomId || !amDM()) return;
+    store.deleteLoot(id);
+    io.to(roomId).emit("loot", store.listLoot(roomId));
+  });
+  socket.on("setGold", (n) => {
+    if (!roomId || !amDM()) return;
+    store.setPartyGold(roomId, Number(n) || 0);
+    io.to(roomId).emit("gold", store.getPartyGold(roomId));
+  });
+
+  // --- Turn timer (DM controls; everyone sees the countdown) ---------------
+  socket.on("startTimer", ({ duration, label }) => {
+    if (!roomId || !amDM()) return;
+    const dur = Math.max(5, Math.min(3600, Number(duration) || 60));
+    const t = getTimer(roomId);
+    t.running = true; t.duration = dur; t.label = (label || "").slice(0, 60); t.endsAt = Date.now() + dur * 1000;
+    io.to(roomId).emit("timer", t);
+  });
+  socket.on("stopTimer", () => {
+    if (!roomId || !amDM()) return;
+    const t = getTimer(roomId); t.running = false; t.endsAt = 0;
+    io.to(roomId).emit("timer", t);
   });
 
   // --- Handouts ("show players" an image) ----------------------------------

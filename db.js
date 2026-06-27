@@ -79,6 +79,23 @@ db.exec(`
     url  TEXT,
     kind TEXT  -- 'ambient' | 'sfx'
   );
+  CREATE TABLE IF NOT EXISTS journal (
+    id         TEXT PRIMARY KEY,
+    room_id    TEXT,
+    title      TEXT,
+    body       TEXT,
+    shared     INTEGER DEFAULT 0,  -- 1 = visible to players
+    updated_at INTEGER
+  );
+  CREATE TABLE IF NOT EXISTS loot (
+    id      TEXT PRIMARY KEY,
+    room_id TEXT,
+    name    TEXT,
+    qty     INTEGER DEFAULT 1,
+    value   INTEGER DEFAULT 0,  -- gp each
+    holder  TEXT,
+    notes   TEXT
+  );
 `);
 
 // Migrations: add columns to existing databases that predate them.
@@ -93,6 +110,7 @@ if (!roomCols.includes("map_rotation")) db.exec("ALTER TABLE rooms ADD COLUMN ma
 if (!roomCols.includes("grid_on")) db.exec("ALTER TABLE rooms ADD COLUMN grid_on INTEGER DEFAULT 0");
 if (!roomCols.includes("grid_size")) db.exec("ALTER TABLE rooms ADD COLUMN grid_size INTEGER DEFAULT 64");
 if (!roomCols.includes("owner_id")) db.exec("ALTER TABLE rooms ADD COLUMN owner_id TEXT");
+if (!roomCols.includes("party_gold")) db.exec("ALTER TABLE rooms ADD COLUMN party_gold INTEGER DEFAULT 0");
 const userCols = db.prepare("PRAGMA table_info(users)").all().map((c) => c.name);
 if (userCols.length && !userCols.includes("name")) db.exec("ALTER TABLE users ADD COLUMN name TEXT");
 if (userCols.length && !userCols.includes("email")) db.exec("ALTER TABLE users ADD COLUMN email TEXT");
@@ -347,5 +365,41 @@ export function isEmailAllowed(roomId, email) { return email ? !!_isAllowed.get(
 export function createSession(token, userId) { _createSession.run(token, userId, Date.now()); }
 export function getSessionUser(token) { return token ? _sessionUser.get(token) : null; }
 export function deleteSession(token) { _delSession.run(token); }
+
+// --- Journal / session notes ----------------------------------------------
+const _upsertJournal = db.prepare(`
+  INSERT INTO journal (id, room_id, title, body, shared, updated_at)
+  VALUES (@id, @room_id, @title, @body, @shared, @updated_at)
+  ON CONFLICT(id) DO UPDATE SET title=@title, body=@body, shared=@shared, updated_at=@updated_at
+`);
+const _delJournal = db.prepare("DELETE FROM journal WHERE id = ?");
+const _listJournal = db.prepare("SELECT * FROM journal WHERE room_id = ? ORDER BY updated_at DESC");
+export function upsertJournal(e) {
+  _upsertJournal.run({ id: e.id, room_id: e.roomId, title: e.title || "", body: e.body || "", shared: e.shared ? 1 : 0, updated_at: Date.now() });
+}
+export function deleteJournal(id) { _delJournal.run(id); }
+export function listJournal(roomId) {
+  return _listJournal.all(roomId).map((r) => ({ id: r.id, title: r.title, body: r.body, shared: !!r.shared, updatedAt: r.updated_at }));
+}
+
+// --- Party loot ------------------------------------------------------------
+const _upsertLoot = db.prepare(`
+  INSERT INTO loot (id, room_id, name, qty, value, holder, notes)
+  VALUES (@id, @room_id, @name, @qty, @value, @holder, @notes)
+  ON CONFLICT(id) DO UPDATE SET name=@name, qty=@qty, value=@value, holder=@holder, notes=@notes
+`);
+const _delLoot = db.prepare("DELETE FROM loot WHERE id = ?");
+const _listLoot = db.prepare("SELECT * FROM loot WHERE room_id = ? ORDER BY name COLLATE NOCASE");
+const _setGold = db.prepare("UPDATE rooms SET party_gold = ? WHERE id = ?");
+const _getGold = db.prepare("SELECT party_gold FROM rooms WHERE id = ?");
+export function upsertLoot(it) {
+  _upsertLoot.run({ id: it.id, room_id: it.roomId, name: it.name || "", qty: it.qty || 1, value: it.value || 0, holder: it.holder || "", notes: it.notes || "" });
+}
+export function deleteLoot(id) { _delLoot.run(id); }
+export function listLoot(roomId) {
+  return _listLoot.all(roomId).map((r) => ({ id: r.id, name: r.name, qty: r.qty, value: r.value, holder: r.holder, notes: r.notes }));
+}
+export function setPartyGold(roomId, n) { _setGold.run(Math.max(0, Math.round(n) || 0), roomId); }
+export function getPartyGold(roomId) { const r = _getGold.get(roomId); return r ? (r.party_gold || 0) : 0; }
 
 export default db;

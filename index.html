@@ -189,8 +189,6 @@
           <button class="tab" data-tab="refs">Refs</button>
           <button class="tab dm-only" data-tab="fx">FX</button>
           <button class="tab" data-tab="ai">✨ AI</button>
-          <button class="tab" data-tab="journal">📖 Journal</button>
-          <button class="tab" data-tab="loot">💰 Loot</button>
         </nav>
 
         <!-- Chat + dice -->
@@ -295,60 +293,8 @@
             <a href="http://dnd5e.wikidot.com/conditions" target="_blank" rel="noopener">Conditions</a>
           </div>
         </div>
-
-        <div id="tab-journal" class="tab-panel">
-          <p class="ref-intro">Session notes &amp; lore. The DM can keep private notes and "share" the ones players should see.</p>
-          <div class="dm-only" style="margin-bottom:8px">
-            <button id="journal-new" class="btn-secondary">+ New note</button>
-          </div>
-          <div id="journal-list"></div>
-        </div>
-
-        <div id="tab-loot" class="tab-panel">
-          <div class="loot-gold">
-            <strong>Party gold:</strong> <span id="loot-gold-val">0</span> gp
-            <span class="dm-only">
-              &nbsp;<input id="loot-gold-input" type="number" placeholder="gp" style="width:80px" />
-              <button id="loot-gold-set" class="btn-secondary">Set</button>
-            </span>
-          </div>
-          <div class="dm-only loot-add">
-            <input id="loot-name" placeholder="Item name" />
-            <input id="loot-qty" type="number" value="1" title="Quantity" style="width:54px" />
-            <input id="loot-value" type="number" value="0" title="Value, gp each" style="width:74px" />
-            <input id="loot-holder" placeholder="Held by" />
-            <button id="loot-add-btn" class="btn-secondary">Add</button>
-          </div>
-          <div id="loot-list"></div>
-          <div class="loot-total">Total item value: <span id="loot-total">0</span> gp</div>
-        </div>
       </aside>
     </main>
-  </div>
-
-  <div id="turn-timer" class="turn-timer hidden">
-    <span id="timer-label"></span>
-    <span id="timer-clock">0:00</span>
-    <span class="dm-only timer-ctrl">
-      <input id="timer-label-in" placeholder="label" style="width:80px" />
-      <input id="timer-secs" type="number" value="60" title="Seconds" style="width:56px" />
-      <button id="timer-start" class="btn-secondary" title="Start">▶</button>
-      <button id="timer-stop" class="btn-secondary" title="Stop">⏸</button>
-    </span>
-  </div>
-
-  <div id="journal-editor" class="sheet-modal hidden">
-    <div class="journal-edit-inner">
-      <h3>Note</h3>
-      <input id="je-title" placeholder="Title" />
-      <textarea id="je-body" placeholder="Write your notes here…" rows="12"></textarea>
-      <label class="je-share"><input type="checkbox" id="je-shared" /> Share with players</label>
-      <div class="je-actions">
-        <button id="je-save" class="btn-primary">Save</button>
-        <button id="je-delete" class="btn-secondary">Delete</button>
-        <button id="je-cancel" class="btn-secondary">Cancel</button>
-      </div>
-    </div>
   </div>
 
   <div id="fx-flash" class="fx-flash"></div>

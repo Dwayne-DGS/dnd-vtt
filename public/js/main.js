@@ -13,6 +13,9 @@ import { initAI } from "./ai.js";
 import { initDice, SKINS, previewDie, applySkin, currentSkin } from "./dice.js";
 import { initSound } from "./sound.js";
 import { initWeather } from "./weather.js";
+import { initJournal } from "./journal.js";
+import { initLoot } from "./loot.js";
+import { initTimer } from "./timer.js";
 
 const socket = io({ autoConnect: false });
 
@@ -327,6 +330,9 @@ function enterApp(room) {
   initDice(socket);
   initSound(socket);
   initWeather(socket);
+  initJournal(socket);
+  initLoot(socket);
+  initTimer(socket);
 
   // Handouts — DM shows an image to everyone.
   const handoutOverlay = document.getElementById("handout-overlay");

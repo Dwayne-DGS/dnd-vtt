@@ -401,3 +401,46 @@ body.is-player .player-note { display: block; }
 body.is-player .dm-only { display: none !important; }
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ============================================================
+   Batch 5: journal, loot, turn timer
+   ============================================================ */
+.muted { color: #9a8c74; font-style: italic; font-size: 13px; }
+
+/* Journal */
+.journal-card { background: linear-gradient(180deg, var(--panel-3), var(--panel-2)); border: 1px solid var(--border-2); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+.journal-card:hover { border-color: var(--gold); }
+.journal-head { display: flex; align-items: center; gap: 8px; color: var(--gold-2); margin-bottom: 4px; }
+.badge-share { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; background: var(--accent); color: #fff; padding: 1px 6px; border-radius: 10px; }
+.journal-body { font-size: 13px; line-height: 1.5; white-space: normal; }
+.journal-meta { font-size: 11px; color: #8a7c64; margin-top: 6px; }
+.journal-edit-inner { background: var(--panel); border: 1px solid var(--gold); border-radius: 12px; padding: 18px; width: min(560px, 92vw); display: flex; flex-direction: column; gap: 10px; }
+.journal-edit-inner h3 { margin: 0; color: var(--gold-2); }
+.journal-edit-inner textarea { width: 100%; resize: vertical; font-family: inherit; }
+.je-share { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.je-actions { display: flex; gap: 8px; }
+#je-delete { margin-left: auto; }
+
+/* Loot */
+.loot-gold { font-size: 14px; margin-bottom: 10px; color: var(--gold-2); }
+.loot-add { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.loot-row { display: flex; align-items: center; gap: 8px; background: linear-gradient(180deg, var(--panel-3), var(--panel-2)); border: 1px solid var(--border-2); border-radius: 7px; padding: 7px 10px; margin-bottom: 6px; font-size: 13px; }
+.loot-row:hover { border-color: var(--gold); }
+.loot-q { color: var(--gold-2); font-weight: 600; }
+.loot-n { flex: 1; }
+.loot-v { color: #c9b890; font-size: 12px; }
+.loot-h { color: #8fae8f; font-size: 12px; }
+.loot-del { background: linear-gradient(180deg, #b03636, #8c2727); padding: 2px 8px; font-size: 12px; }
+.loot-total { margin-top: 8px; color: var(--gold-2); font-weight: 600; }
+
+/* Turn timer (floating) */
+.turn-timer { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); z-index: 40; display: flex; align-items: center; gap: 10px; background: rgba(20, 15, 10, 0.92); border: 1px solid var(--gold); border-radius: 30px; padding: 6px 16px; box-shadow: 0 4px 18px rgba(0,0,0,0.5); font-family: "Cinzel", serif; }
+#timer-label { color: var(--gold-2); font-size: 13px; }
+#timer-clock { font-size: 22px; font-weight: 700; color: var(--ink); min-width: 56px; text-align: center; }
+.turn-timer.timer-warn { border-color: #e0a020; }
+.turn-timer.timer-warn #timer-clock { color: #f0c050; }
+.turn-timer.timer-done { border-color: var(--accent); animation: fade 0.6s infinite alternate; }
+.turn-timer.timer-done #timer-clock { color: #ff6b5b; }
+.timer-ctrl { display: flex; align-items: center; gap: 5px; }
+.timer-ctrl input { padding: 3px 6px; font-size: 12px; }
+.timer-ctrl button { padding: 3px 9px; }
