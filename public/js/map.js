@@ -25,6 +25,9 @@ export function initMap(socket) {
   let measureMode = false, ruler = null; // ruler in screen coords {x1,y1,x2,y2}
   let currentName = null;                 // active initiative combatant
   let pings = [];                         // {nx,ny,t}
+  let drawings = [], templates = [];      // map annotations (normalized to map rect)
+  let drawMode = false, tplMode = false, tplShape = "circle", tplFeet = 20;
+  let stroke = null, cone = null;         // in-progress drawing / cone template
 
   const TOKEN_R = 22;
   const GRID = 50;
@@ -78,6 +81,7 @@ export function initMap(socket) {
     } else drawGrid();
 
     for (const t of tokens) drawToken(t);
+    drawAnnotations(rect);
     if (fog.enabled) drawFog(rect);
     ctx.restore();
 
@@ -197,6 +201,13 @@ export function initMap(socket) {
     const p = pos(e), w = toWorld(p);
     if (measureMode) { ruler = { x1: p.x, y1: p.y, x2: p.x, y2: p.y }; return; }
     if (e.altKey) { sendPing(w); return; }
+    if (drawMode && window.isDM) { const r = mapRect(); stroke = { pts: [norm(w, r)], color: "#e4c884", w: 2.5 }; return; }
+    if (tplMode && window.isDM) {
+      const r = mapRect(); const c = norm(w, r);
+      if (tplShape === "circle") { socket.emit("addTemplate", { kind: "circle", x: c.x, y: c.y, feet: tplFeet }); }
+      else { cone = { kind: "cone", x: c.x, y: c.y, tx: c.x, ty: c.y }; }
+      return;
+    }
     if (revealMode && window.isDM) { painting = true; paint(w); return; }
     const t = tokenAt(w);
     if (t) { dragging = t; dragOffset = { x: t.x - w.x, y: t.y - w.y }; }
@@ -205,6 +216,8 @@ export function initMap(socket) {
   canvas.addEventListener("mousemove", (e) => {
     const p = pos(e);
     if (ruler && measureMode) { ruler.x2 = p.x; ruler.y2 = p.y; draw(); return; }
+    if (stroke) { const r = mapRect(); stroke.pts.push(norm(toWorld(p), r)); draw(); return; }
+    if (cone) { const r = mapRect(); const c = norm(toWorld(p), r); cone.tx = c.x; cone.ty = c.y; draw(); return; }
     if (painting) { paint(toWorld(p)); return; }
     if (panning) { cam.x += p.x - panStart.x; cam.y += p.y - panStart.y; panStart = p; draw(); return; }
     if (dragging) {
@@ -214,6 +227,8 @@ export function initMap(socket) {
   });
   window.addEventListener("mouseup", () => {
     if (ruler && measureMode) { ruler = null; draw(); }
+    if (stroke) { if (stroke.pts.length > 1) { drawings.push(stroke); socket.emit("drawStroke", stroke); } stroke = null; draw(); }
+    if (cone) { templates.push(cone); socket.emit("addTemplate", cone); cone = null; draw(); }
     painting = false; panning = false;
     if (dragging) {
       if (snapEnabled) { dragging.x = snap(dragging.x); dragging.y = snap(dragging.y); }
@@ -250,6 +265,42 @@ export function initMap(socket) {
     const key = cellAt(w);
     if (!key || fog.revealed.has(key)) return;
     fog.revealed.add(key); draw(); socket.emit("fogReveal", [key]);
+  }
+
+  // --- annotations: drawings + spell templates -----------------------------
+  const norm = (w, rect) => ({ x: (w.x - rect.x) / rect.w, y: (w.y - rect.y) / rect.h });
+  const denorm = (p, rect) => ({ x: rect.x + p.x * rect.w, y: rect.y + p.y * rect.h });
+
+  function drawAnnotations(rect) {
+    const cellWorld = (grid.size || 64) * (rect.scale || 1);
+    // freehand strokes
+    const all = stroke ? drawings.concat([stroke]) : drawings;
+    for (const s of all) {
+      if (!s.pts || s.pts.length < 2) continue;
+      ctx.beginPath();
+      s.pts.forEach((p, i) => { const d = denorm(p, rect); i ? ctx.lineTo(d.x, d.y) : ctx.moveTo(d.x, d.y); });
+      ctx.strokeStyle = s.color || "#e4c884"; ctx.lineWidth = (s.w || 2.5) / cam.scale;
+      ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.stroke();
+    }
+    // templates
+    const tpls = cone ? templates.concat([cone]) : templates;
+    for (const t of tpls) {
+      const c = denorm(t, rect);
+      ctx.fillStyle = "rgba(192,57,43,0.28)"; ctx.strokeStyle = "rgba(228,200,132,0.9)"; ctx.lineWidth = 1.5 / cam.scale;
+      if (t.kind === "circle") {
+        const r = (t.feet / 5) * cellWorld;
+        ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      } else {
+        const e = denorm({ x: t.tx, y: t.ty }, rect);
+        const ang = Math.atan2(e.y - c.y, e.x - c.x);
+        const len = Math.hypot(e.x - c.x, e.y - c.y);
+        const half = len * Math.tan((26.5 * Math.PI) / 180); // 5e cone ≈ length
+        ctx.beginPath(); ctx.moveTo(c.x, c.y);
+        ctx.lineTo(c.x + Math.cos(ang) * len - Math.sin(ang) * half, c.y + Math.sin(ang) * len + Math.cos(ang) * half);
+        ctx.lineTo(c.x + Math.cos(ang) * len + Math.sin(ang) * half, c.y + Math.sin(ang) * len - Math.cos(ang) * half);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+    }
   }
 
   // --- token context menu (DM) --------------------------------------------
@@ -298,6 +349,20 @@ export function initMap(socket) {
   measureBtn?.addEventListener("click", () => { measureMode = !measureMode; measureBtn.classList.toggle("active", measureMode); canvas.style.cursor = measureMode ? "crosshair" : "default"; });
   document.getElementById("view-reset")?.addEventListener("click", () => { cam.x = 0; cam.y = 0; cam.scale = 1; draw(); });
 
+  const drawBtn = document.getElementById("draw-toggle");
+  const tplBtn = document.getElementById("tpl-toggle");
+  drawBtn?.addEventListener("click", () => {
+    drawMode = !drawMode; tplMode = false; tplBtn?.classList.remove("active");
+    drawBtn.classList.toggle("active", drawMode); canvas.style.cursor = drawMode ? "crosshair" : "default";
+  });
+  tplBtn?.addEventListener("click", () => {
+    tplMode = !tplMode; drawMode = false; drawBtn?.classList.remove("active");
+    tplBtn.classList.toggle("active", tplMode); canvas.style.cursor = tplMode ? "crosshair" : "default";
+  });
+  document.getElementById("tpl-shape")?.addEventListener("change", (e) => { tplShape = e.target.value; });
+  document.getElementById("tpl-ft")?.addEventListener("change", (e) => { tplFeet = Math.max(5, Number(e.target.value) || 20); });
+  document.getElementById("anno-clear")?.addEventListener("click", () => { socket.emit("clearDrawings"); socket.emit("clearTemplates"); });
+
   function applyGrid(g) { grid = { on: !!g.on, size: g.size || 64 }; gridBtn?.classList.toggle("active", grid.on); draw(); }
   function applyFog(f) { fog = { enabled: !!f.enabled, revealed: new Set(f.revealed || []) }; fogBtn?.classList.toggle("active", fog.enabled); draw(); }
 
@@ -307,9 +372,17 @@ export function initMap(socket) {
     rotation = s.mapRotation || 0;
     grid = { on: !!s.gridOn, size: s.gridSize || 64 };
     gridBtn?.classList.toggle("active", grid.on);
+    const anno = s.anno || {};
+    drawings = anno.drawings || [];
+    templates = anno.templates || [];
+    if (window._setWeather) window._setWeather(anno.weather || "none");
     setMap(s.mapUrl);
     applyFog(s.fog || {});
   });
+  socket.on("drawStroke", (st) => { drawings.push(st); draw(); });
+  socket.on("clearDrawings", () => { drawings = []; draw(); });
+  socket.on("addTemplate", (t) => { templates.push(t); draw(); });
+  socket.on("clearTemplates", () => { templates = []; draw(); });
   socket.on("mapUrl", setMap);
   socket.on("mapRotation", (deg) => { rotation = deg || 0; draw(); });
   socket.on("gridState", applyGrid);

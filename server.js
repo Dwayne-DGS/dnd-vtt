@@ -44,7 +44,12 @@ function setSessionCookie(res, token) {
   res.setHeader("Set-Cookie", `vtt_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`);
 }
 function userFromReq(req) { return store.getSessionUser(parseCookies(req.headers.cookie)["vtt_session"]); }
-const pubUser = (u) => (u ? { username: u.username, role: u.role, name: u.name || null, gmRequested: !!u.gm_requested } : null);
+const pubUser = (u) => {
+  if (!u) return null;
+  let macros = [];
+  try { macros = JSON.parse(u.macros || "[]"); } catch {}
+  return { username: u.username, role: u.role, name: u.name || null, gmRequested: !!u.gm_requested, diceSkin: u.dice_skin || "galaxy", macros };
+};
 
 app.post("/auth/signup", (req, res) => {
   const username = String(req.body.username || "").trim().toLowerCase();
@@ -63,7 +68,7 @@ app.post("/auth/signup", (req, res) => {
   const token = randomBytes(32).toString("hex");
   store.createSession(token, id);
   setSessionCookie(res, token);
-  res.json({ user: { username, role: finalRole, name } });
+  res.json({ user: pubUser(store.getUserByUsername(username)) });
 });
 
 app.post("/auth/login", (req, res) => {
@@ -95,8 +100,8 @@ const UPLOAD_DIR = join(__dirname, "public", "uploads");
 const MAX_UPLOAD = 30 * 1024 * 1024; // 30 MB
 app.post("/upload", (req, res) => {
   const type = (req.headers["content-type"] || "").toLowerCase();
-  if (!type.startsWith("image/")) {
-    return res.status(400).json({ error: "Images only" });
+  if (!type.startsWith("image/") && !type.startsWith("audio/")) {
+    return res.status(400).json({ error: "Images or audio only" });
   }
   const ext = (type.split("/")[1] || "png").replace(/[^a-z0-9]/g, "").slice(0, 5) || "png";
   mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -135,6 +140,13 @@ function persistInit(roomId) {
 }
 // Who is currently in the voice call, per room.
 const voiceRooms = new Map(); // roomId -> Set<socketId>
+
+// Ephemeral map annotations per room: freehand drawings, area templates, weather.
+const annotations = new Map(); // roomId -> { drawings:[], templates:[], weather:"none" }
+function getAnno(roomId) {
+  if (!annotations.has(roomId)) annotations.set(roomId, { drawings: [], templates: [], weather: "none" });
+  return annotations.get(roomId);
+}
 
 // Fog of war per room. revealed = Set of "col,row" cell keys in a normalized
 // grid over the map. enabled=false means the whole map is visible.
@@ -192,6 +204,7 @@ io.on("connection", (socket) => {
       maps: store.getMaps(roomId),
       initiative: getInit(roomId),
       fog: fogPayload(roomId),
+      anno: getAnno(roomId),
     });
   }
 
@@ -263,6 +276,62 @@ io.on("connection", (socket) => {
     if (!socket.user) return;
     socket.emit("myTablesList", store.getUserTables(socket.user.id, socket.user.email));
   });
+
+  // Save a cosmetic dice-skin preference on the account.
+  socket.on("setDiceSkin", (skin) => {
+    if (!socket.user || typeof skin !== "string" || skin.length > 20) return;
+    store.setDiceSkin(socket.user.id, skin);
+  });
+  // Save the player's dice macros to their account.
+  socket.on("setMacros", (macros) => {
+    if (!socket.user || !Array.isArray(macros)) return;
+    store.setMacros(socket.user.id, JSON.stringify(macros.slice(0, 30)));
+  });
+
+  // --- Soundboard (DM controls; everyone hears) ----------------------------
+  socket.on("listSounds", () => { if (roomId) socket.emit("soundList", store.listSounds()); });
+  socket.on("saveSound", ({ name, url, kind }) => {
+    if (!roomId || !amDM() || !url) return;
+    store.saveSound(randomUUID(), name || "Sound", url, kind === "ambient" ? "ambient" : "sfx");
+    io.emit("soundList", store.listSounds());
+  });
+  socket.on("deleteSound", (id) => { if (!roomId || !amDM()) return; store.deleteSound(id); io.emit("soundList", store.listSounds()); });
+  socket.on("playSound", ({ url, kind }) => { if (!roomId || !amDM() || !url) return; io.to(roomId).emit("sound", { url, kind }); });
+  socket.on("stopAmbient", () => { if (!roomId || !amDM()) return; io.to(roomId).emit("stopAmbient"); });
+
+  // --- Map annotations: drawings, templates, weather (DM) ------------------
+  socket.on("drawStroke", (stroke) => {
+    if (!roomId || !amDM() || !stroke) return;
+    const a = getAnno(roomId);
+    a.drawings.push(stroke);
+    if (a.drawings.length > 400) a.drawings.shift();
+    socket.to(roomId).emit("drawStroke", stroke); // others (the artist already sees it)
+  });
+  socket.on("clearDrawings", () => {
+    if (!roomId || !amDM()) return;
+    getAnno(roomId).drawings = [];
+    io.to(roomId).emit("clearDrawings");
+  });
+  socket.on("addTemplate", (t) => {
+    if (!roomId || !amDM() || !t) return;
+    getAnno(roomId).templates.push(t);
+    io.to(roomId).emit("addTemplate", t);
+  });
+  socket.on("clearTemplates", () => {
+    if (!roomId || !amDM()) return;
+    getAnno(roomId).templates = [];
+    io.to(roomId).emit("clearTemplates");
+  });
+  socket.on("setWeather", (w) => {
+    if (!roomId || !amDM()) return;
+    const weather = ["none", "rain", "snow", "fog"].includes(w) ? w : "none";
+    getAnno(roomId).weather = weather;
+    io.to(roomId).emit("weather", weather);
+  });
+
+  // --- Handouts ("show players" an image) ----------------------------------
+  socket.on("showHandout", (url) => { if (!roomId || !amDM() || !url) return; io.to(roomId).emit("handout", String(url)); });
+  socket.on("clearHandout", () => { if (!roomId || !amDM()) return; io.to(roomId).emit("handoutClear"); });
 
   // A player requests GM access (admins approve in their panel; email later).
   socket.on("requestGm", () => {
@@ -509,21 +578,35 @@ io.on("connection", (socket) => {
   });
 
   // --- Dice + chat ---------------------------------------------------------
-  socket.on("roll", (notation) => {
+  socket.on("roll", async (notation, opts = {}) => {
     if (!roomId) return;
-    const result = rollDice(notation);
+    const a = rollDice(notation);
     const who = names.get(socket.id) || "Player";
-    if (result.error) {
-      socket.emit("chat", sys(`Roll error: ${result.error}`));
-      return;
+    if (a.error) { socket.emit("chat", sys(`Roll error: ${a.error}`)); return; }
+
+    let payload;
+    if (opts.advantage || opts.disadvantage) {
+      const b = rollDice(notation);
+      const adv = !!opts.advantage;
+      const keep = adv ? (a.total >= b.total ? a : b) : (a.total <= b.total ? a : b);
+      payload = {
+        type: "roll", who,
+        text: `rolled ${a.notation} with ${adv ? "advantage" : "disadvantage"} = ${keep.total}`,
+        detail: `kept ${keep.total} of [${a.total}, ${b.total}]`,
+        ts: Date.now(),
+      };
+    } else {
+      payload = { type: "roll", who, text: `rolled ${a.notation} = ${a.total}`, detail: a.breakdown, ts: Date.now() };
     }
-    io.to(roomId).emit("chat", {
-      type: "roll",
-      who,
-      text: `rolled ${result.notation} = ${result.total}`,
-      detail: result.breakdown,
-      ts: Date.now(),
-    });
+
+    if (opts.secret) {
+      payload.text = "🔒 " + payload.text;
+      socket.emit("chat", payload); // the roller sees it
+      const socks = await io.in(roomId).fetchSockets();
+      for (const s of socks) { if (s.id !== socket.id && dmFlags.get(s.id)) s.emit("chat", payload); } // and the DM
+    } else {
+      io.to(roomId).emit("chat", payload);
+    }
   });
 
   socket.on("chat", (text) => {
@@ -633,6 +716,14 @@ io.on("connection", (socket) => {
   socket.on("initClear", () => {
     if (!roomId || !amDM()) return;
     initiatives.set(roomId, { round: 1, turn: 0, started: false, entries: [] });
+    pushInit();
+  });
+  socket.on("initRollAll", () => {
+    if (!roomId || !amDM()) return;
+    const state = getInit(roomId);
+    state.entries.forEach((e) => { e.init = 1 + Math.floor(Math.random() * 20); });
+    state.started = false; // re-establish the order from the top
+    sortInit(state);
     pushInit();
   });
 

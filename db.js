@@ -72,6 +72,13 @@ db.exec(`
     email   TEXT NOT NULL,
     PRIMARY KEY (room_id, email)
   );
+
+  CREATE TABLE IF NOT EXISTS sounds (
+    id   TEXT PRIMARY KEY,
+    name TEXT,
+    url  TEXT,
+    kind TEXT  -- 'ambient' | 'sfx'
+  );
 `);
 
 // Migrations: add columns to existing databases that predate them.
@@ -90,6 +97,8 @@ const userCols = db.prepare("PRAGMA table_info(users)").all().map((c) => c.name)
 if (userCols.length && !userCols.includes("name")) db.exec("ALTER TABLE users ADD COLUMN name TEXT");
 if (userCols.length && !userCols.includes("email")) db.exec("ALTER TABLE users ADD COLUMN email TEXT");
 if (userCols.length && !userCols.includes("gm_requested")) db.exec("ALTER TABLE users ADD COLUMN gm_requested INTEGER DEFAULT 0");
+if (userCols.length && !userCols.includes("dice_skin")) db.exec("ALTER TABLE users ADD COLUMN dice_skin TEXT");
+if (userCols.length && !userCols.includes("macros")) db.exec("ALTER TABLE users ADD COLUMN macros TEXT");
 const tokenCols = db.prepare("PRAGMA table_info(tokens)").all().map((c) => c.name);
 if (!tokenCols.includes("img")) db.exec("ALTER TABLE tokens ADD COLUMN img TEXT");
 if (!tokenCols.includes("hp")) db.exec("ALTER TABLE tokens ADD COLUMN hp INTEGER");
@@ -288,6 +297,18 @@ export function listUsers() { return _listUsers.all(); }
 export function setUserRole(id, role) { _setRole.run(role, id); }
 export function setUserPassword(id, hash) { _setPass.run(hash, id); }
 export function setGmRequested(id, v) { _setGmReq.run(v ? 1 : 0, id); }
+const _setSkin = db.prepare("UPDATE users SET dice_skin = ? WHERE id = ?");
+export function setDiceSkin(id, skin) { _setSkin.run(skin, id); }
+const _setMacros = db.prepare("UPDATE users SET macros = ? WHERE id = ?");
+export function setMacros(id, json) { _setMacros.run(json, id); }
+
+// --- Soundboard (shared library) ------------------------------------------
+const _addSound = db.prepare("INSERT INTO sounds (id, name, url, kind) VALUES (?, ?, ?, ?)");
+const _delSound = db.prepare("DELETE FROM sounds WHERE id = ?");
+const _allSounds = db.prepare("SELECT * FROM sounds ORDER BY kind, name COLLATE NOCASE");
+export function saveSound(id, name, url, kind) { _addSound.run(id, name, url, kind); }
+export function deleteSound(id) { _delSound.run(id); }
+export function listSounds() { return _allSounds.all(); }
 export function deleteUser(id) { _delUserSessions.run(id); _delUser.run(id); }
 
 // --- Room ownership & membership ------------------------------------------

@@ -37,7 +37,7 @@ export function initChat(socket) {
   function submit() {
     const text = input.value.trim();
     if (!text) return;
-    if (DICE_RE.test(text)) socket.emit("roll", text);
+    if (DICE_RE.test(text)) socket.emit("roll", text, window.rollOpts || {});
     else socket.emit("chat", text);
     input.value = "";
   }

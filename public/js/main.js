@@ -10,7 +10,9 @@ import { initReference } from "./reference.js";
 import { initVoice } from "./voice.js";
 import { initFX } from "./fx.js";
 import { initAI } from "./ai.js";
-import { initDice } from "./dice.js";
+import { initDice, SKINS, previewDie, applySkin, currentSkin } from "./dice.js";
+import { initSound } from "./sound.js";
+import { initWeather } from "./weather.js";
 
 const socket = io({ autoConnect: false });
 
@@ -44,6 +46,30 @@ function showLanding(user) {
   socket.connect();
   socket.emit("myTables");
   if (user.role === "admin") socket.emit("adminUsers"); // refreshes the pending badge (won't open the panel)
+}
+
+// --- Settings (dice skins) ----------------------------------------------
+const settingsOverlay = document.getElementById("settings-overlay");
+const skinGrid = document.getElementById("skin-grid");
+document.getElementById("settings-link").addEventListener("click", openSettings);
+document.getElementById("settings-close").addEventListener("click", () => settingsOverlay.classList.add("hidden"));
+function openSettings() {
+  const cur = (window.account && window.account.diceSkin) || currentSkin();
+  skinGrid.innerHTML = "";
+  Object.entries(SKINS).forEach(([id, sk]) => {
+    const card = document.createElement("button");
+    card.className = "skin-card" + (id === cur ? " selected" : "");
+    card.innerHTML = previewDie(id) + `<span>${sk.name}</span>`;
+    card.addEventListener("click", () => {
+      applySkin(id);
+      if (window.account) window.account.diceSkin = id;
+      socket.connect();
+      socket.emit("setDiceSkin", id);
+      openSettings();
+    });
+    skinGrid.appendChild(card);
+  });
+  settingsOverlay.classList.remove("hidden");
 }
 
 document.getElementById("request-gm").addEventListener("click", () => { socket.connect(); socket.emit("requestGm"); });
@@ -299,6 +325,24 @@ function enterApp(room) {
   initFX(socket);
   initAI(socket);
   initDice(socket);
+  initSound(socket);
+  initWeather(socket);
+
+  // Handouts — DM shows an image to everyone.
+  const handoutOverlay = document.getElementById("handout-overlay");
+  const handoutFile = document.getElementById("handout-file");
+  document.getElementById("handout-btn")?.addEventListener("click", () => handoutFile.click());
+  handoutFile?.addEventListener("change", async () => {
+    const f = handoutFile.files[0]; handoutFile.value = "";
+    if (!f) return;
+    try { socket.emit("showHandout", await uploadImage(f)); } catch (e) { alert(e.message); }
+  });
+  socket.on("handout", (url) => { document.getElementById("handout-img").src = url; handoutOverlay.classList.remove("hidden"); });
+  socket.on("handoutClear", () => handoutOverlay.classList.add("hidden"));
+  document.getElementById("handout-close").addEventListener("click", () => {
+    handoutOverlay.classList.add("hidden");
+    if (window.isDM) socket.emit("clearHandout");
+  });
 
   const mapUrl = document.getElementById("map-url");
   const mapPicker = document.getElementById("map-picker");

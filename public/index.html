@@ -64,10 +64,22 @@
         <button id="create-btn">Create table</button>
       </div>
 
+      <button id="settings-link" class="link-btn">⚙ Settings</button>
       <button id="request-gm" class="link-btn hidden">Request Game Master access</button>
       <button id="accounts-link" class="link-btn hidden">Manage accounts (admin)</button>
       <button id="admin-link" class="link-btn">Manage rooms (owner)</button>
       <button id="logout-join" class="link-btn">Log out</button>
+    </div>
+  </div>
+
+  <!-- Settings (per account) -->
+  <div id="settings-overlay" class="admin-overlay hidden">
+    <div class="admin-card">
+      <h2>Settings</h2>
+      <h3 class="dash-h">Your dice</h3>
+      <p class="join-hint">Pick a dice style. It's saved to your account and used wherever you roll.</p>
+      <div id="skin-grid" class="skin-grid"></div>
+      <button id="settings-close" class="btn-secondary">Close</button>
     </div>
   </div>
 
@@ -122,7 +134,10 @@
         <button id="map-upload" class="btn-secondary dm-only" title="Upload a map image from your computer">⬆ Map</button>
         <button id="map-rotate" class="btn-secondary dm-only" title="Rotate the map 90°">⟳</button>
         <button id="players-btn" class="btn-secondary dm-only" title="Manage who can join this table">👥 Players</button>
+        <button id="handout-btn" class="btn-secondary dm-only" title="Show an image to all players">🖼 Show</button>
+        <button id="mute-btn" class="btn-secondary" title="Mute sounds">🔊</button>
         <button id="logout-btn" class="btn-secondary" title="Log out">⎋ Log out</button>
+        <input type="file" id="handout-file" accept="image/*" hidden />
         <button id="add-token" class="dm-only">+ Token</button>
         <button id="add-portrait" class="dm-only" title="Add a token with a portrait image">+ 📷</button>
         <button id="grid-toggle" class="btn-secondary dm-only" title="Overlay a grid (for maps without one)">⊞ Grid</button>
@@ -134,6 +149,14 @@
         <button id="fog-toggle" class="btn-secondary dm-only" title="Turn fog of war on/off">🌫 Fog</button>
         <button id="fog-reveal" class="btn-secondary dm-only" title="Paint to reveal areas (drag on the map)">Reveal</button>
         <button id="fog-reset" class="btn-secondary dm-only" title="Hide the whole map again">Reset fog</button>
+        <button id="draw-toggle" class="btn-secondary dm-only" title="Freehand draw on the map">✏️ Draw</button>
+        <button id="tpl-toggle" class="btn-secondary dm-only" title="Place a spell template">🔺 Template</button>
+        <select id="tpl-shape" class="dm-only" title="Template shape"><option value="circle">Circle</option><option value="cone">Cone</option></select>
+        <input id="tpl-ft" class="dm-only" type="number" value="20" title="Template size (ft)" style="width:54px" />
+        <button id="anno-clear" class="btn-secondary dm-only" title="Clear drawings &amp; templates">🧹</button>
+        <select id="weather-select" class="dm-only" title="Weather">
+          <option value="none">☀ Clear</option><option value="rain">🌧 Rain</option><option value="snow">❄ Snow</option><option value="fog">🌫 Mist</option>
+        </select>
         <input type="file" id="map-file" accept="image/*" hidden />
         <input type="file" id="portrait-file" accept="image/*" hidden />
         <span class="voice-controls">
@@ -148,6 +171,7 @@
     <main class="layout">
       <section class="map-wrap">
         <canvas id="map-canvas"></canvas>
+        <canvas id="weather-canvas" class="weather-canvas hidden"></canvas>
         <div id="video-strip" class="video-strip hidden"></div>
         <p class="hint">Scroll to zoom · drag empty space to pan · Alt-click to ping · drag a token to move it</p>
       </section>
@@ -166,6 +190,12 @@
         <!-- Chat + dice -->
         <div id="tab-chat" class="tab-panel active">
           <div id="chat-log" class="chat-log"></div>
+          <div id="macro-bar" class="macro-bar"></div>
+          <div class="roll-mods">
+            <button id="mod-adv" title="Roll twice, keep the higher">Advantage</button>
+            <button id="mod-dis" title="Roll twice, keep the lower">Disadvantage</button>
+            <button id="mod-secret" title="Only you and the DM see the result">🔒 Secret</button>
+          </div>
           <div class="dice-bar" id="dice-bar"></div>
           <div class="chat-input">
             <input id="chat-text" placeholder="Message, or roll like 2d6+3…" />
@@ -184,6 +214,7 @@
           <div class="init-header">
             <span id="init-round" class="init-round">Round 1</span>
             <div class="dm-only">
+              <button id="init-rollall" class="btn-secondary" title="Roll initiative (d20) for everyone">🎲 Roll all</button>
               <button id="init-next">Next turn ▶</button>
               <button id="init-clear" class="btn-secondary">Clear</button>
             </div>
@@ -213,6 +244,18 @@
         <div id="tab-fx" class="tab-panel">
           <p class="join-hint">Fire a lighting effect — flashes everyone's screen, and your Philips Hue lights if the helper is running.</p>
           <div id="fx-buttons" class="fx-buttons"></div>
+          <h3 class="dash-h" style="margin-top:16px">Soundboard</h3>
+          <p class="join-hint">Add ambient loops or sound effects (upload a file or paste a URL), then play them for the whole table.</p>
+          <div class="snd-add">
+            <input id="snd-name" placeholder="Name (e.g. Tavern)" />
+            <input id="snd-url" placeholder="audio URL, or upload →" />
+            <input type="file" id="snd-file" accept="audio/*" hidden />
+            <button id="snd-upload" class="btn-secondary" title="Upload an audio file">⬆</button>
+            <select id="snd-kind"><option value="ambient">Ambient (loops)</option><option value="sfx">Sound FX</option></select>
+            <button id="snd-save">Add</button>
+          </div>
+          <button id="snd-stop" class="btn-secondary">⏹ Stop ambient</button>
+          <div id="snd-list" class="snd-list"></div>
         </div>
 
         <!-- AI assistant -->
@@ -252,6 +295,13 @@
 
   <div id="fx-flash" class="fx-flash"></div>
   <div id="dice-anim" class="dice-anim hidden"></div>
+  <div id="handout-overlay" class="handout-overlay hidden">
+    <div class="handout-inner">
+      <img id="handout-img" alt="handout" />
+      <button id="handout-close" class="btn-secondary">Close</button>
+    </div>
+  </div>
+  <audio id="ambient" loop></audio>
   <div id="sheet-modal" class="sheet-modal hidden"></div>
   <div id="token-menu" class="token-menu hidden"></div>
 

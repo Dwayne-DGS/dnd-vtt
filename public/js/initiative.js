@@ -20,6 +20,9 @@ export function initInitiative(socket) {
   [nameI, rollI, hpI].forEach((el) =>
     el.addEventListener("keydown", (e) => { if (e.key === "Enter") add(); })
   );
+  document.getElementById("init-rollall")?.addEventListener("click", () =>
+    socket.emit("initRollAll")
+  );
   document.getElementById("init-next").addEventListener("click", () =>
     socket.emit("initNext")
   );
