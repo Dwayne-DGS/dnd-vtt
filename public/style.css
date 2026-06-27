@@ -108,6 +108,8 @@ select { cursor: pointer; }
   animation: pop .25s ease;
 }
 .join-card h1 { margin: 0 0 18px; color: var(--gold-2); font-size: 26px; text-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+.brand-logo { display: block; width: 100%; max-width: 320px; height: auto; margin: 0 auto 18px; filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55)); }
+#welcome { font-size: 20px; }
 .join-card label { display: block; text-align: left; margin: 12px 0 5px; color: var(--muted); font-size: 13px; font-weight: 500; }
 .join-card input { width: 100%; }
 .join-card button { width: 100%; margin-top: 18px; padding: 11px; font-size: 15px; }
@@ -152,6 +154,7 @@ select { cursor: pointer; }
   z-index: 10;
 }
 .brand { font-weight: 700; color: var(--gold-2); font-size: 17px; letter-spacing: 0.06em; }
+.brand-logo-sm { height: 34px; width: auto; display: block; flex: 0 0 auto; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
 .room-label { color: var(--muted); font-size: 13px; }
 .role-badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; letter-spacing: 0.04em; text-transform: uppercase; }
 .role-badge.dm { background: linear-gradient(180deg, var(--accent), var(--accent-d)); color: #fff; }

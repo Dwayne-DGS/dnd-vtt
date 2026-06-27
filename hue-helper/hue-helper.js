@@ -255,6 +255,48 @@ app.post("/api/server", (req, res) => {
 });
 app.post("/api/effect", async (req, res) => { await applyEffect(req.body.id); res.json({ ok: true }); });
 
+// --- Connectivity check ----------------------------------------------------
+// Which network interface is carrying us (and its IP).
+function netIface() {
+  for (const [name, list] of Object.entries(os.networkInterfaces())) {
+    for (const i of list || []) {
+      if (i.family === "IPv4" && !i.internal) return { name, address: i.address };
+    }
+  }
+  return null;
+}
+// Try an HTTP(S) GET; any response means "reachable". Resolves quickly on failure.
+function httpProbe(urlStr, timeout = 4000) {
+  return new Promise((resolve) => {
+    let u;
+    try { u = new URL(urlStr); } catch { return resolve({ ok: false, error: "bad url" }); }
+    const lib = u.protocol === "http:" ? http : https;
+    const opts = {
+      method: "GET", host: u.hostname,
+      port: u.port || (u.protocol === "http:" ? 80 : 443),
+      path: u.pathname || "/", timeout,
+    };
+    if (lib === https) opts.rejectUnauthorized = false;
+    const req = lib.request(opts, (res) => { res.resume(); resolve({ ok: true, status: res.statusCode }); });
+    req.on("timeout", () => { req.destroy(); resolve({ ok: false, error: "timeout" }); });
+    req.on("error", (e) => resolve({ ok: false, error: e.code || e.message }));
+    req.end();
+  });
+}
+app.get("/api/network", async (_req, res) => {
+  const iface = netIface();
+  const net = iface
+    ? { ok: true, iface: iface.name, ip: iface.address,
+        type: iface.name.startsWith("wl") ? "Wi-Fi" : (/^(en|eth)/.test(iface.name) ? "Ethernet" : iface.name) }
+    : { ok: false };
+  const [internet, server, bridge] = await Promise.all([
+    httpProbe("https://www.google.com/generate_204", 4000),
+    config.serverUrl ? httpProbe(config.serverUrl, 5000) : Promise.resolve({ ok: false, error: "no server set" }),
+    config.bridgeIp ? httpProbe(`${config.scheme === "http" ? "http" : "https"}://${config.bridgeIp}/api/config`, 4000) : Promise.resolve({ ok: false, error: "no bridge set" }),
+  ]);
+  res.json({ net, internet: { ok: internet.ok }, server: { ok: server.ok }, bridge: { ok: bridge.ok } });
+});
+
 app.listen(UI_PORT, () => {
   console.log(`\n  D&D Hue helper running.`);
   console.log(`  Open the setup page:  http://localhost:${UI_PORT}\n`);

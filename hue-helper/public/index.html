@@ -29,12 +29,24 @@
   .fx { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-top:10px; }
   .groups { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 12px; }
   .hint { color:var(--muted); font-size:12px; }
+  .netline { display:block; margin:6px 0; }
+  .status.checking { background:#3a341f; color:#e8d99b; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>🎲 D&D Hue Helper</h1>
   <p class="hint">Keep this program running during your game. It listens for spell effects and flashes your Hue lights.</p>
+
+  <div class="card">
+    <h2>Connection check</h2>
+    <p class="hint">First set up Wi-Fi in Raspberry Pi OS (or plug in an ethernet cable). Then confirm the Pi can reach everything it needs:</p>
+    <div id="net-network" class="status bad netline">Network: …</div>
+    <div id="net-internet" class="status bad netline">Internet: …</div>
+    <div id="net-server" class="status bad netline">Game server: …</div>
+    <div id="net-bridge" class="status bad netline">Hue Bridge: …</div>
+    <button id="net-check" class="sec">Check again</button>
+  </div>
 
   <div class="card">
     <h2>1. Connect to your game</h2>
@@ -143,7 +155,34 @@ EFFECTS.forEach(([id, label]) => {
   b.onclick = () => api("/api/effect", { id });
   fxBox.appendChild(b);
 });
+// --- Connection check ------------------------------------------------------
+async function checkNetwork() {
+  ["net-network","net-internet","net-server","net-bridge"].forEach((id) => {
+    const el = $(id); el.className = "status checking netline";
+    el.textContent = el.textContent.split(":")[0] + ": checking…";
+  });
+  try {
+    const r = await api("/api/network");
+    const set = (id, label, res, extra) => {
+      const el = $(id);
+      el.textContent = `${label}: ${res.ok ? "OK" + (extra ? ` (${extra})` : "") : "not reachable"}`;
+      el.className = "status netline " + (res.ok ? "ok" : "bad");
+    };
+    set("net-network", "Network", r.net, r.net.ok ? `${r.net.type} · ${r.net.ip}` : "");
+    set("net-internet", "Internet", r.internet);
+    set("net-server", "Game server", r.server);
+    set("net-bridge", "Hue Bridge", r.bridge);
+  } catch (e) {
+    ["net-network","net-internet","net-server","net-bridge"].forEach((id) => {
+      const el = $(id); el.className = "status bad netline";
+      el.textContent = el.textContent.split(":")[0] + ": check failed";
+    });
+  }
+}
+$("net-check").onclick = checkNetwork;
+
 refresh();
+checkNetwork();
 setInterval(pollStatus, 5000); // status badges only — won't disturb your selections
 </script>
 </body>
