@@ -126,6 +126,8 @@ if (userCols.length && !userCols.includes("plan")) db.exec("ALTER TABLE users AD
 if (userCols.length && !userCols.includes("trial_start")) db.exec("ALTER TABLE users ADD COLUMN trial_start INTEGER");
 if (userCols.length && !userCols.includes("ai_used")) db.exec("ALTER TABLE users ADD COLUMN ai_used INTEGER DEFAULT 0");
 if (userCols.length && !userCols.includes("ai_period")) db.exec("ALTER TABLE users ADD COLUMN ai_period TEXT");
+if (userCols.length && !userCols.includes("ai_cost")) db.exec("ALTER TABLE users ADD COLUMN ai_cost REAL DEFAULT 0");      // raw API $ used this month
+if (userCols.length && !userCols.includes("ai_credit")) db.exec("ALTER TABLE users ADD COLUMN ai_credit REAL DEFAULT 0");  // purchased top-up $ remaining
 const tokenCols = db.prepare("PRAGMA table_info(tokens)").all().map((c) => c.name);
 if (!tokenCols.includes("img")) db.exec("ALTER TABLE tokens ADD COLUMN img TEXT");
 if (!tokenCols.includes("hp")) db.exec("ALTER TABLE tokens ADD COLUMN hp INTEGER");
@@ -307,7 +309,7 @@ const _createUser = db.prepare("INSERT INTO users (id, username, name, email, pa
 const _userByName = db.prepare("SELECT * FROM users WHERE username = ?");
 const _userById = db.prepare("SELECT * FROM users WHERE id = ?");
 const _countUsers = db.prepare("SELECT COUNT(*) n FROM users");
-const _listUsers = db.prepare("SELECT id, username, name, email, role, gm_requested, created_at, plan, trial_start FROM users ORDER BY created_at");
+const _listUsers = db.prepare("SELECT id, username, name, email, role, gm_requested, created_at, plan, trial_start, ai_cost, ai_credit, ai_period FROM users ORDER BY created_at");
 const _setRole = db.prepare("UPDATE users SET role = ? WHERE id = ?");
 const _setPass = db.prepare("UPDATE users SET pass_hash = ? WHERE id = ?");
 const _setGmReq = db.prepare("UPDATE users SET gm_requested = ? WHERE id = ?");
@@ -335,10 +337,12 @@ export function setDice3d(id, v) { _setDice3d.run(v ? 1 : 0, id); }
 // --- Billing / entitlements ----------------------------------------------
 const _setPlan = db.prepare("UPDATE users SET plan = ? WHERE id = ?");
 const _startTrial = db.prepare("UPDATE users SET trial_start = ? WHERE id = ? AND trial_start IS NULL");
-const _setAiUsage = db.prepare("UPDATE users SET ai_used = ?, ai_period = ? WHERE id = ?");
+const _setAiMeter = db.prepare("UPDATE users SET ai_cost = ?, ai_credit = ?, ai_used = ?, ai_period = ? WHERE id = ?");
+const _addAiCredit = db.prepare("UPDATE users SET ai_credit = COALESCE(ai_credit,0) + ? WHERE id = ?");
 export function setPlan(id, plan) { _setPlan.run(plan || null, id); }
 export function startTrial(id) { _startTrial.run(Date.now(), id); } // only sets if not already started
-export function setAiUsage(id, used, period) { _setAiUsage.run(used, period, id); }
+export function setAiMeter(id, cost, credit, used, period) { _setAiMeter.run(cost, credit, used, period, id); }
+export function addAiCredit(id, usd) { _addAiCredit.run(Number(usd) || 0, id); }
 
 // --- Soundboard (shared library) ------------------------------------------
 const _addSound = db.prepare("INSERT INTO sounds (id, name, url, kind) VALUES (?, ?, ?, ?)");

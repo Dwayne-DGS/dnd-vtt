@@ -137,6 +137,13 @@ select { cursor: pointer; }
 .ai-upsell { font-size: 13px; line-height: 1.5; padding: 10px 12px; border-radius: var(--radius); margin-bottom: 10px; background: rgba(201,164,90,0.12); border: 1px solid var(--gold); color: var(--ink); }
 .ai-upsell.hidden { display: none; }
 .acct-plan { font-size: 12px; }
+/* AI usage meter */
+.ai-meter { margin-bottom: 10px; font-size: 12.5px; color: var(--muted); }
+.ai-meter.hidden { display: none; }
+.ai-meter-row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 5px; }
+.ai-meter-row b { color: var(--gold-2); }
+.ai-meter-bar { height: 6px; background: var(--panel-3); border-radius: 999px; overflow: hidden; }
+.ai-meter-bar > div { height: 100%; background: linear-gradient(90deg, var(--gold), var(--accent)); }
 .my-tables { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
 .table-row { display: flex; align-items: stretch; gap: 8px; width: 100%; }
 .table-open { flex: 1 1 auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: linear-gradient(180deg, var(--panel-3), var(--panel-2)); border: 1px solid var(--border-2); color: var(--ink); padding: 13px 16px; border-radius: var(--radius); text-align: left; font-size: 15px; }

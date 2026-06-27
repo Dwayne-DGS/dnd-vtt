@@ -52,7 +52,15 @@ function userFromReq(req) { return store.getSessionUser(parseCookies(req.headers
 // --- Billing / entitlements -----------------------------------------------
 const TRIAL_DAYS = 30;
 const TRIAL_MS = TRIAL_DAYS * 24 * 60 * 60 * 1000;
-const AI_MONTHLY_CAP = 200; // fair-use limit on AI actions per GM per month
+// AI cost metering. Default = Claude Sonnet pricing ($/token); override via env if
+// you switch models. INCLUDED_AI_USD is the API spend bundled into the GM+AI plan;
+// beyond that a GM must have purchased top-up credit.
+const AI_PRICE_IN = Number(process.env.AI_PRICE_IN || 3) / 1e6;   // $3 / M input tokens
+const AI_PRICE_OUT = Number(process.env.AI_PRICE_OUT || 15) / 1e6; // $15 / M output tokens
+const INCLUDED_AI_USD = Number(process.env.INCLUDED_AI_USD || 4);
+const aiMonth = () => new Date().toISOString().slice(0, 7); // YYYY-MM
+const aiCostThisMonth = (u) => (u && u.ai_period === aiMonth() ? (u.ai_cost || 0) : 0);
+const aiAvailableUsd = (u) => (entitledAI(u) ? Math.max(0, INCLUDED_AI_USD - aiCostThisMonth(u)) + (u.ai_credit || 0) : 0);
 const trialActive = (u) => !!(u && u.trial_start && Date.now() - u.trial_start < TRIAL_MS);
 const trialEndsAt = (u) => (u && u.trial_start ? u.trial_start + TRIAL_MS : null);
 // Can this account run tables as a DM? Admins always; GMs during trial or on a paid plan.
@@ -72,6 +80,7 @@ const pubUser = (u) => {
     diceSkin: u.dice_skin || "galaxy", dice3d: u.dice3d == null ? 1 : u.dice3d, macros,
     plan: u.plan || null, trialEndsAt: trialEndsAt(u), trialActive: trialActive(u),
     gmEntitled: entitledGM(u), aiEntitled: entitledAI(u),
+    aiUsed: Math.min(aiCostThisMonth(u), INCLUDED_AI_USD), aiIncluded: entitledAI(u) ? INCLUDED_AI_USD : 0, aiCredit: u.ai_credit || 0,
   };
 };
 
@@ -504,41 +513,53 @@ io.on("connection", (socket) => {
     if (!entitledAI(me)) {
       return socket.emit("aiError", "✨ The AI assistant is part of the GM + AI plan. Upgrade (or start your free trial) to use it.");
     }
-    // Monthly fair-use cap (admins exempt) — keeps API costs predictable.
-    if (me.role !== "admin") {
-      const period = new Date().toISOString().slice(0, 7); // YYYY-MM
-      const used = me.ai_period === period ? (me.ai_used || 0) : 0;
-      if (used >= AI_MONTHLY_CAP) {
-        return socket.emit("aiError", `You've reached this month's limit of ${AI_MONTHLY_CAP} AI actions. It resets next month.`);
-      }
-      store.setAiUsage(me.id, used + 1, period);
+    // Cost cap (admins exempt): each GM gets INCLUDED_AI_USD of API spend per month,
+    // plus any purchased top-up credit. Block when both are exhausted.
+    if (me.role !== "admin" && aiAvailableUsd(me) <= 0) {
+      return socket.emit("aiError", `You've used this month's included AI ($${INCLUDED_AI_USD.toFixed(2)}). Add more AI credit to keep going, or wait for next month's reset.`);
     }
     const now = Date.now();
     if (now - aiLast < 3000) return socket.emit("aiError", "Please wait a few seconds between AI requests.");
     aiLast = now;
     socket.emit("aiBusy", mode);
+    let usage = null;
     try {
       if (mode === "character") {
-        const data = mapCharacter(await callClaude({ system: AI_SYS.character, prompt: text, tool: CHARACTER_TOOL }), names.get(socket.id));
+        const out = await callClaude({ system: AI_SYS.character, prompt: text, tool: CHARACTER_TOOL }); usage = out.usage;
+        const data = mapCharacter(out.value, names.get(socket.id));
         const id = randomUUID();
         store.upsertCharacter(id, roomId, data);
         io.to(roomId).emit("characterSaved", { id, ...data });
         socket.emit("aiDone", { mode, message: `Created “${data.name}”. Open the PCs tab to see it.` });
       } else if (mode === "creature") {
-        const data = mapCreature(await callClaude({ system: AI_SYS.creature, prompt: text, tool: CREATURE_TOOL }));
+        const out = await callClaude({ system: AI_SYS.creature, prompt: text, tool: CREATURE_TOOL }); usage = out.usage;
+        const data = mapCreature(out.value);
         const id = randomUUID();
         store.upsertCreature(id, roomId, data);
         io.to(roomId).emit("creatureSaved", { id, ...data });
         socket.emit("aiDone", { mode, message: `Added “${data.name}” to the Bestiary.` });
       } else if (mode === "rules" || mode === "story") {
-        const answer = await callClaude({ system: AI_SYS[mode], prompt: text });
-        socket.emit("aiAnswer", { mode, text: answer });
+        const out = await callClaude({ system: AI_SYS[mode], prompt: text }); usage = out.usage;
+        socket.emit("aiAnswer", { mode, text: out.value });
       } else {
         socket.emit("aiError", "Unknown AI action.");
       }
     } catch (e) {
       console.error("AI error:", e.message);
       socket.emit("aiError", e.message || "AI request failed.");
+    }
+    // Charge the actual API cost to this account's monthly meter (admins exempt).
+    if (usage && me.role !== "admin") {
+      const cost = (usage.input_tokens || 0) * AI_PRICE_IN + (usage.output_tokens || 0) * AI_PRICE_OUT;
+      const period = aiMonth();
+      const prevCost = me.ai_period === period ? (me.ai_cost || 0) : 0;
+      const prevUsed = me.ai_period === period ? (me.ai_used || 0) : 0;
+      const newCost = prevCost + cost;
+      // The portion beyond the included allowance is drawn from purchased credit.
+      const spilled = Math.max(0, newCost - INCLUDED_AI_USD) - Math.max(0, prevCost - INCLUDED_AI_USD);
+      const newCredit = Math.max(0, (me.ai_credit || 0) - spilled);
+      store.setAiMeter(me.id, newCost, newCredit, prevUsed + 1, period);
+      socket.emit("aiUsage", { used: Math.min(newCost, INCLUDED_AI_USD), included: INCLUDED_AI_USD, credit: newCredit });
     }
   });
 
@@ -555,6 +576,7 @@ io.on("connection", (socket) => {
       id: u.id, username: u.username, name: u.name, email: u.email, role: u.role,
       gm_requested: u.gm_requested, created_at: u.created_at, is_super: u.id === sid,
       plan: u.plan || null, trialActive: trialActive(u), trialEndsAt: trialEndsAt(u),
+      aiUsed: Math.min(aiCostThisMonth(u), INCLUDED_AI_USD), aiIncluded: INCLUDED_AI_USD, aiCredit: u.ai_credit || 0,
       tables: store.getUserTables(u.id, u.email),
     }));
   };
@@ -581,6 +603,15 @@ io.on("connection", (socket) => {
     if (![null, "", "gm", "gm_ai"].includes(plan)) return;
     if (!store.getUserById(id)) return;
     store.setPlan(id, plan || null);
+    socket.emit("adminUserList", userListPayload());
+  });
+  // Admin grants AI top-up credit (USD of API allowance). Until Stripe, this is
+  // how you sell extra AI usage; later a Stripe purchase calls the same path.
+  socket.on("adminAddAiCredit", ({ id, usd }) => {
+    if (!isAdmin()) return socket.emit("adminError", "Admins only.");
+    const amount = Number(usd);
+    if (!store.getUserById(id) || !isFinite(amount) || amount === 0) return;
+    store.addAiCredit(id, amount);
     socket.emit("adminUserList", userListPayload());
   });
   socket.on("adminDenyGm", (id) => {
@@ -1043,12 +1074,14 @@ async function callClaude({ system, prompt, tool }) {
     throw new Error(`AI request failed (${r.status}). ${t.slice(0, 160)}`);
   }
   const data = await r.json();
+  const usage = data.usage || {}; // { input_tokens, output_tokens }
   if (tool) {
     const block = (data.content || []).find((c) => c.type === "tool_use");
     if (!block) throw new Error("AI did not return structured data.");
-    return block.input;
+    return { value: block.input, usage };
   }
-  return (data.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n").trim();
+  const text = (data.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n").trim();
+  return { value: text, usage };
 }
 
 function mapCharacter(c, owner) {

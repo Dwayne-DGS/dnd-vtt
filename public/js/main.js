@@ -241,9 +241,15 @@ socket.on("adminUserList", (users) => {
           <option value="gm"${u.plan === "gm" ? " selected" : ""}>Plan: GM ($5)</option>
           <option value="gm_ai"${u.plan === "gm_ai" ? " selected" : ""}>Plan: GM + AI ($10)</option>
         </select>
+        <button class="acct-credit btn-secondary" title="Grant AI top-up credit (USD)">+ AI credit</button>
         ${locked ? '<span class="ar-meta">owner account — managed by the owner only</span>'
           : '<button class="acct-reset btn-secondary">Reset password</button><button class="acct-del">Delete</button>'}
       </div>`;
+    row.querySelector(".acct-credit").addEventListener("click", () => {
+      const v = prompt(`Add AI credit for "${u.username}" — dollars of API usage (e.g. 5 for $5). Use a negative number to deduct.`);
+      const usd = Number(v);
+      if (v != null && isFinite(usd) && usd !== 0) socket.emit("adminAddAiCredit", { id: u.id, usd });
+    });
     if (!locked) {
       row.querySelector(".acct-role").addEventListener("change", (e) => socket.emit("adminSetRole", { id: u.id, role: e.target.value }));
       row.querySelector(".acct-plan").addEventListener("change", (e) => socket.emit("adminSetPlan", { id: u.id, plan: e.target.value }));
@@ -284,16 +290,35 @@ socket.on("allowedEmails", (emails) => {
 });
 function escAcct(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
+// AI usage meter shown in the AI tab (cost-based monthly allowance + credit).
+function renderAiMeter(used, included, credit) {
+  const el = document.getElementById("ai-meter");
+  if (!el) return;
+  if ((included || 0) <= 0 && (credit || 0) <= 0) { el.className = "ai-meter hidden"; return; }
+  const pct = included > 0 ? Math.min(100, Math.round((used / included) * 100)) : 100;
+  const creditTxt = credit > 0 ? ` · <b>$${credit.toFixed(2)}</b> top-up credit` : "";
+  el.innerHTML =
+    `<div class="ai-meter-row"><span>AI usage this month</span><span>$${(used || 0).toFixed(2)} / $${(included || 0).toFixed(2)} included${creditTxt}</span></div>` +
+    `<div class="ai-meter-bar"><div style="width:${pct}%"></div></div>`;
+  el.className = "ai-meter";
+}
+
 // Short billing status for the admin accounts list.
 function billingLabel(u) {
-  if (u.plan === "gm_ai") return "💳 Plan: GM + AI ($10)";
-  if (u.plan === "gm") return "💳 Plan: GM ($5)";
-  if (u.trialActive && u.trialEndsAt) {
+  let plan;
+  if (u.plan === "gm_ai") plan = "💳 Plan: GM + AI ($10)";
+  else if (u.plan === "gm") plan = "💳 Plan: GM ($5)";
+  else if (u.trialActive && u.trialEndsAt) {
     const d = Math.max(0, Math.ceil((u.trialEndsAt - Date.now()) / 86400000));
-    return `⏳ Trial: ${d} day${d === 1 ? "" : "s"} left`;
+    plan = `⏳ Trial: ${d} day${d === 1 ? "" : "s"} left`;
+  } else if (u.trialEndsAt) plan = "Trial ended — no plan";
+  else plan = "No plan / trial";
+  // Append AI usage for accounts that can use it.
+  if (u.plan === "gm_ai" || u.trialActive) {
+    plan += ` · AI $${(u.aiUsed || 0).toFixed(2)}/$${(u.aiIncluded || 0).toFixed(2)}`;
+    if (u.aiCredit > 0) plan += ` (+$${u.aiCredit.toFixed(2)} credit)`;
   }
-  if (u.trialEndsAt) return "Trial ended — no plan";
-  return "No plan / trial";
+  return plan;
 }
 
 // Show GMs their trial countdown or a subscribe prompt. Players/admins see nothing.
@@ -462,6 +487,10 @@ function enterApp(room) {
   // Show the AI upsell in the AI tab if this account isn't entitled to the assistant.
   const aiUp = document.getElementById("ai-upsell");
   if (aiUp) aiUp.classList.toggle("hidden", !!(window.account && window.account.aiEntitled));
+  // AI usage meter (cost-based): included $ + any purchased credit.
+  const a = window.account || {};
+  renderAiMeter(a.aiUsed || 0, a.aiIncluded || 0, a.aiCredit || 0);
+  socket.on("aiUsage", ({ used, included, credit }) => renderAiMeter(used, included, credit));
 
   // Handouts — DM shows an image to everyone.
   const handoutOverlay = document.getElementById("handout-overlay");
