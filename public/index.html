@@ -65,12 +65,16 @@
         <button id="create-btn">Create table</button>
       </div>
 
-      <button id="settings-link" class="link-btn">⚙ Settings</button>
-      <button id="help-link" class="link-btn">❔ Help &amp; guide</button>
-      <button id="request-gm" class="link-btn hidden">Request Game Master access</button>
-      <button id="accounts-link" class="link-btn hidden">Manage accounts (admin)</button>
-      <button id="tables-admin-link" class="link-btn hidden">Manage all tables (admin)</button>
-      <button id="logout-join" class="link-btn">Log out</button>
+      <div class="dash-footer">
+        <button id="settings-link" class="link-btn">⚙ Settings</button>
+        <button id="help-link" class="link-btn">❔ Help &amp; guide</button>
+        <button id="request-gm" class="link-btn hidden">Request GM access</button>
+        <button id="logout-join" class="link-btn">Log out</button>
+      </div>
+      <div class="dash-footer dash-admin">
+        <button id="accounts-link" class="link-btn hidden">Manage accounts</button>
+        <button id="tables-admin-link" class="link-btn hidden">Manage all tables</button>
+      </div>
     </div>
   </div>
 
@@ -180,7 +184,7 @@
         </div>
         <!-- 🎨 Draw & weather -->
         <div class="menu dm-only">
-          <button class="menu-trigger btn-secondary" type="button" data-tip="Draw on the map, place spell templates, and set weather">🎨 Draw ▾</button>
+          <button class="menu-trigger btn-secondary" type="button" data-tip="Draw on the map and place spell templates">🎨 Draw ▾</button>
           <div class="menu-panel">
             <div class="menu-row">
               <button id="draw-toggle" class="btn-secondary" title="Freehand draw on the map">✏️ Draw</button>
@@ -191,6 +195,12 @@
               <input id="tpl-ft" type="number" value="20" title="Template size (ft)" style="width:64px" />
               <button id="anno-clear" class="btn-secondary" title="Clear drawings, templates, walls &amp; lights">🧹 Clear</button>
             </div>
+          </div>
+        </div>
+        <!-- 🌦 Weather -->
+        <div class="menu dm-only">
+          <button class="menu-trigger btn-secondary" type="button" data-tip="Overlay rain, snow, or mist on the map">🌦 Weather ▾</button>
+          <div class="menu-panel">
             <div class="menu-label">Weather</div>
             <select id="weather-select" title="Weather">
               <option value="none">☀ Clear</option><option value="rain">🌧 Rain</option><option value="snow">❄ Snow</option><option value="fog">🌫 Mist</option>

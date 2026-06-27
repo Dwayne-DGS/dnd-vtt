@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FAQ — warcrimes.us</title>
+  <meta name="description" content="Common questions about warcrimes.us — the private, ad-free D&D 5e virtual tabletop." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/site.css" />
+</head>
+<body>
+  <header class="nav">
+    <div class="nav-inner">
+      <a href="/"><img src="/assets/warcrimes-logo.png" alt="warcrimes.us" class="nav-logo" /></a>
+      <nav class="nav-links" id="navlinks">
+        <a href="/">Home</a>
+        <a href="/features.html">Features</a>
+        <a href="/pricing.html">Pricing</a>
+        <a href="/faq.html" class="active">FAQ</a>
+      </nav>
+      <div class="nav-cta">
+        <a href="/play" class="login-link" style="color:var(--ink);font-weight:500;font-size:14px">Log in</a>
+        <a href="/play" class="btn btn-primary">Create free account</a>
+        <button class="nav-toggle" aria-label="Menu" onclick="document.getElementById('navlinks').classList.toggle('open')">☰</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="page-head wrap">
+    <h1>Frequently asked questions</h1>
+    <p>Everything you might want to know before your first session.</p>
+  </section>
+
+  <section class="section">
+    <div class="faq wrap">
+      <details open><summary>Do I need to download or install anything?</summary><p>No. warcrimes.us runs entirely in your web browser — players and Game Masters alike. Just create an account and open a table.</p></details>
+      <details><summary>Is it really free?</summary><p>Players play free, forever. Game Masters can try everything free and only upgrade if they want to create and run their own tables. There are no ads and nothing is sold to third parties.</p></details>
+      <details><summary>What game systems does it support?</summary><p>It's purpose-built for Dungeons &amp; Dragons 5th Edition — character sheets, bestiary, initiative, and spell templates are all tuned for 5e.</p></details>
+      <details><summary>What makes it different from the big platforms?</summary><p>It's private and ad-free, every feature is included instead of locked behind tiers, and it has tools the others don't — a built-in AI assistant, true 3D physics dice, and Philips Hue light syncing. You can even host it on your own server.</p></details>
+      <details><summary>How does the AI assistant work?</summary><p>Describe a character or monster and it generates a complete, rules-legal 5e stat block. You can also ask it rules questions and get encounter ideas, right from the sidebar during play.</p></details>
+      <details><summary>Do voice and video need another app?</summary><p>No — voice and video run in the browser over a secure connection. Just click “Join voice.”</p></details>
+      <details><summary>What is the Philips Hue integration?</summary><p>An optional helper program runs on a small computer (like a Raspberry Pi) on your home network. When the DM fires a spell effect, it flashes your real smart lights to match — red for fire, green for healing, and so on.</p></details>
+      <details><summary>Can I host it myself?</summary><p>Yes. The Guild plan lets you run the whole platform on your own server so your data stays entirely yours, with no subscription. Reach out and we'll help you get set up.</p></details>
+      <details><summary>Is my campaign data private?</summary><p>Yes. Your maps, characters, and notes live on the server you play on. There are no ads and no tracking built into the experience.</p></details>
+      <details><summary>How do my friends join my game?</summary><p>Create a table as a Game Master and share its name plus an invite link or password. Players join in seconds, and the table then shows up in their dashboard.</p></details>
+    </div>
+  </section>
+
+  <section class="cta-band">
+    <div class="wrap">
+      <h2>Still curious? Just dive in.</h2>
+      <p>The fastest way to see it is to create a free account and roll some dice.</p>
+      <a href="/play" class="btn btn-primary btn-lg">Create free account</a>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div style="max-width:280px">
+          <img src="/assets/warcrimes-logo.png" alt="warcrimes.us" class="footer-logo" />
+          <p style="font-size:14px;margin:0">A private, ad-free virtual tabletop for Dungeons &amp; Dragons 5th Edition.</p>
+        </div>
+        <div><h4>Product</h4><a href="/features.html">Features</a><a href="/pricing.html">Pricing</a><a href="/faq.html">FAQ</a><a href="/play">Log in</a></div>
+        <div><h4>Get started</h4><a href="/play">Create account</a><a href="/play">Launch the app</a></div>
+      </div>
+      <div class="footer-bottom">
+        <span>© <span id="year"></span> warcrimes.us</span>
+        <span>Not affiliated with Wizards of the Coast.</span>
+      </div>
+    </div>
+  </footer>
+  <script>document.getElementById("year").textContent = new Date().getFullYear();</script>
+</body>
+</html>

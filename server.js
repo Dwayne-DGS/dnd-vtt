@@ -31,6 +31,10 @@ function adminPassword() {
 }
 
 app.use(express.json()); // parses application/json bodies (not the image uploads)
+// Public marketing site at "/"; the actual app lives at "/play". These routes
+// run before express.static so "/" doesn't fall through to index.html.
+app.get("/", (_req, res) => res.sendFile(join(__dirname, "public", "home.html")));
+app.get("/play", (_req, res) => res.sendFile(join(__dirname, "public", "index.html")));
 app.use(express.static(join(__dirname, "public")));
 app.get("/health", (_req, res) => res.json({ ok: true }));
 

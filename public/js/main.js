@@ -43,8 +43,10 @@ function showLanding(user) {
   const canCreate = user.role === "gm" || user.role === "admin";
   document.getElementById("mode-create").classList.toggle("hidden", !canCreate);
   if (!canCreate) document.getElementById("mode-join").click();
-  document.getElementById("accounts-link").classList.toggle("hidden", user.role !== "admin");
-  document.getElementById("tables-admin-link").classList.toggle("hidden", user.role !== "admin");
+  const isAdmin = user.role === "admin";
+  document.getElementById("accounts-link").classList.toggle("hidden", !isAdmin);
+  document.getElementById("tables-admin-link").classList.toggle("hidden", !isAdmin);
+  document.querySelector(".dash-admin").classList.toggle("hidden", !isAdmin); // hide the whole admin row for non-admins
   // Players can request GM access (hidden once they're GM/admin).
   const reqBtn = document.getElementById("request-gm");
   reqBtn.classList.toggle("hidden", user.role !== "player");
@@ -154,7 +156,7 @@ async function authPost(path, body) {
   if (!r.ok) throw new Error(j.error || "Something went wrong.");
   return j;
 }
-function logout() { fetch("/auth/logout", { method: "POST" }).then(() => location.reload()); }
+function logout() { fetch("/auth/logout", { method: "POST" }).then(() => { location.href = "/"; }); }
 
 // Auth screen tabs
 const loginForm = document.getElementById("login-form");

@@ -6,6 +6,9 @@ vtt.db
 vtt.db-shm
 vtt.db-wal
 
+# Database backups (created on the server by backup.js)
+backups/
+
 # Uploaded images live on the server, not in git
 public/uploads/
 

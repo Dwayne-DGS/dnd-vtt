@@ -116,15 +116,23 @@ select { cursor: pointer; }
 .mode-tabs { display: flex; gap: 6px; margin-bottom: 18px; background: var(--bg-2); padding: 4px; border-radius: var(--radius); }
 .mode-tab { flex: 1; background: transparent; color: var(--muted); border: none; box-shadow: none; padding: 9px; }
 .mode-tab.active { background: linear-gradient(180deg, var(--accent), var(--accent-d)); color: #fff; }
+
+/* Dashboard is wider than the login card; keep the form itself a comfortable width. */
+#join-screen .join-card { width: 600px; padding: 38px 44px; }
+#join-screen .mode-tabs, #join-screen #join-form, #join-screen #create-form { max-width: 440px; margin-left: auto; margin-right: auto; }
+.dash-footer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 20px; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border); }
+.dash-footer .link-btn { margin: 0; }
+.dash-footer + .dash-footer { margin-top: 8px; padding-top: 10px; border-top: none; }
+.dash-admin .link-btn { color: var(--gold-2); }
 .join-hint { color: var(--muted); font-size: 12px; text-align: left; margin: 10px 0 0; line-height: 1.5; }
 .auth-error { color: #e89b9b; font-size: 13px; min-height: 16px; margin: 12px 0 0; }
 .dash-h { text-align: left; margin: 6px 0 8px; color: var(--gold-2); font-size: 15px; }
-.my-tables { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
-.table-row { display: flex; align-items: stretch; gap: 6px; width: 100%; }
-.table-open { flex: 1; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(180deg, var(--panel-3), var(--panel-2)); border: 1px solid var(--border-2); color: var(--ink); padding: 11px 14px; text-align: left; }
+.my-tables { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+.table-row { display: flex; align-items: stretch; gap: 8px; width: 100%; }
+.table-open { flex: 1 1 auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: linear-gradient(180deg, var(--panel-3), var(--panel-2)); border: 1px solid var(--border-2); color: var(--ink); padding: 13px 16px; border-radius: var(--radius); text-align: left; font-size: 15px; }
 .table-open:hover { border-color: var(--gold); }
-.table-open .table-role { font-size: 11px; color: var(--gold-2); font-weight: 700; }
-.table-del { flex: 0 0 auto; background: linear-gradient(180deg, var(--panel-3), var(--panel-2)); border: 1px solid var(--border-2); color: var(--muted); padding: 0 12px; font-size: 15px; }
+.table-open .table-role { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--gold-2); background: rgba(0,0,0,0.28); padding: 3px 9px; border-radius: 999px; }
+.table-del { flex: 0 0 46px; width: 46px; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, var(--panel-3), var(--panel-2)); border: 1px solid var(--border-2); color: var(--muted); border-radius: var(--radius); font-size: 15px; }
 .table-del:hover { border-color: #b03636; color: #e89b9b; }
 .owner-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; background: var(--gold); color: #1a130a; padding: 1px 6px; border-radius: 10px; }
 /* Account cards in the admin panel */
@@ -504,6 +512,7 @@ body.is-player .dm-only { display: none !important; }
 .help-section li { margin: 4px 0; }
 .help-section code { background: var(--panel-3); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
 .help-dm { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; background: var(--accent); color: #fff; padding: 1px 6px; border-radius: 10px; }
+.help-admin-badge { background: var(--gold); color: #1a130a; }
 @media (max-width: 640px) { .help-nav { display: none; } }
 
 /* Hue helper locator (FX tab) */

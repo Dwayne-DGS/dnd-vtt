@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pricing — warcrimes.us</title>
+  <meta name="description" content="Players play free, forever. Game Masters unlock the full toolkit for a small monthly fee. Or host it yourself." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/site.css" />
+</head>
+<body>
+  <header class="nav">
+    <div class="nav-inner">
+      <a href="/"><img src="/assets/warcrimes-logo.png" alt="warcrimes.us" class="nav-logo" /></a>
+      <nav class="nav-links" id="navlinks">
+        <a href="/">Home</a>
+        <a href="/features.html">Features</a>
+        <a href="/pricing.html" class="active">Pricing</a>
+        <a href="/faq.html">FAQ</a>
+      </nav>
+      <div class="nav-cta">
+        <a href="/play" class="login-link" style="color:var(--ink);font-weight:500;font-size:14px">Log in</a>
+        <a href="/play" class="btn btn-primary">Create free account</a>
+        <button class="nav-toggle" aria-label="Menu" onclick="document.getElementById('navlinks').classList.toggle('open')">☰</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="page-head wrap">
+    <h1>Simple, honest pricing</h1>
+    <p>Players never pay a cent. Game Masters get the whole toolkit for less than a coffee a month.</p>
+  </section>
+
+  <section class="section wrap">
+    <div class="tiers">
+      <!-- FREE -->
+      <div class="tier">
+        <div class="tier-name">Adventurer</div>
+        <div class="price">Free<small> / forever</small></div>
+        <div class="tier-tag">For players joining a table</div>
+        <ul>
+          <li>Join unlimited tables</li>
+          <li>Full D&amp;D 5e character sheets</li>
+          <li>3D dice, macros &amp; chat</li>
+          <li>Voice &amp; video</li>
+          <li>Journal, loot &amp; initiative</li>
+          <li class="no">Create / host tables</li>
+          <li class="no">Game Master tools</li>
+        </ul>
+        <a href="/play" class="btn btn-ghost">Create free account</a>
+      </div>
+
+      <!-- PREMIUM (featured) -->
+      <div class="tier featured">
+        <span class="ribbon">Most popular</span>
+        <div class="tier-name">Game Master</div>
+        <div class="price">$5<small> / month</small></div>
+        <div class="tier-tag">Everything to run your campaign</div>
+        <ul>
+          <li>Everything in Adventurer</li>
+          <li>Create unlimited tables</li>
+          <li>Dynamic lighting &amp; fog of war</li>
+          <li>Maps, tokens, weather &amp; effects</li>
+          <li>Built-in AI assistant</li>
+          <li>Soundboard &amp; handouts</li>
+          <li>Philips Hue light sync</li>
+        </ul>
+        <a href="/play" class="btn btn-primary">Start free, upgrade anytime</a>
+      </div>
+
+      <!-- SELF-HOST -->
+      <div class="tier">
+        <div class="tier-name">Guild (Self-host)</div>
+        <div class="price">Own it<small> / one-time</small></div>
+        <div class="tier-tag">Run it on your own server</div>
+        <ul>
+          <li>The complete platform, self-hosted</li>
+          <li>Your data stays entirely yours</li>
+          <li>Unlimited players &amp; tables</li>
+          <li>No subscription, no ads, ever</li>
+          <li>Bring your own AI &amp; Hue keys</li>
+          <li>Full feature set included</li>
+        </ul>
+        <a href="/faq.html" class="btn btn-gold">Talk to us</a>
+      </div>
+    </div>
+    <p class="center muted" style="margin-top:24px;font-size:13px">Prices shown are placeholders — edit them in <code>pricing.html</code> once you decide your model. Payments aren't wired up yet.</p>
+  </section>
+
+  <section class="section wrap">
+    <div class="sec-head"><h2>Questions about plans?</h2><p>The short version: try everything free, and only Game Masters running their own tables ever need to upgrade.</p></div>
+    <div class="center"><a href="/faq.html" class="btn btn-ghost btn-lg">Read the FAQ</a></div>
+  </section>
+
+  <section class="cta-band">
+    <div class="wrap">
+      <h2>Start free tonight</h2>
+      <p>No credit card. Upgrade only if and when you want to run your own table.</p>
+      <a href="/play" class="btn btn-primary btn-lg">Create free account</a>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div style="max-width:280px">
+          <img src="/assets/warcrimes-logo.png" alt="warcrimes.us" class="footer-logo" />
+          <p style="font-size:14px;margin:0">A private, ad-free virtual tabletop for Dungeons &amp; Dragons 5th Edition.</p>
+        </div>
+        <div><h4>Product</h4><a href="/features.html">Features</a><a href="/pricing.html">Pricing</a><a href="/faq.html">FAQ</a><a href="/play">Log in</a></div>
+        <div><h4>Get started</h4><a href="/play">Create account</a><a href="/play">Launch the app</a></div>
+      </div>
+      <div class="footer-bottom">
+        <span>© <span id="year"></span> warcrimes.us</span>
+        <span>Not affiliated with Wizards of the Coast.</span>
+      </div>
+    </div>
+  </footer>
+  <script>document.getElementById("year").textContent = new Date().getFullYear();</script>
+</body>
+</html>

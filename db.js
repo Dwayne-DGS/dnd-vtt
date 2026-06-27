@@ -9,7 +9,10 @@ import { dirname, join } from "path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const db = new Database(join(__dirname, "vtt.db"));
-db.pragma("journal_mode = WAL");
+db.pragma("journal_mode = WAL");      // concurrent readers while a write is in progress
+db.pragma("synchronous = NORMAL");    // safe with WAL, much faster than FULL
+db.pragma("busy_timeout = 5000");     // wait up to 5s for a lock instead of erroring
+db.pragma("foreign_keys = ON");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS rooms (

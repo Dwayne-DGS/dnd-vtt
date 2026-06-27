@@ -34,7 +34,7 @@ const SECTIONS = [
         <li><b>Join a new table</b> — enter a table name and its invite password (ask your GM). After the first join it appears in "Your tables".</li>
         <li><b>Create a table</b> (GMs) — name it and optionally set an invite password to share with players.</li>
         <li><b>Delete a table</b> — on a table you own, click the 🗑 on its row in "Your tables" to remove it and all its data.</li>
-        <li><b>⚙ Settings</b>, <b>Request GM access</b>, <b>Manage accounts</b> / <b>Manage all tables</b> (admin), and <b>Log out</b> live here too.</li>
+        <li><b>⚙ Settings</b>, <b>Request GM access</b> (players), and <b>Log out</b> live here too.</li>
       </ul>` },
 
   {
@@ -64,7 +64,8 @@ const SECTIONS = [
         <li><b>🗺 Map</b> — pick or remove a saved map; paste a map URL and <b>Set map</b>; <b>★ Save</b> to your library; <b>⬆ Upload</b> from your computer; <b>⟳ Rotate</b>; and the <b>⊞ Grid</b> toggle with <b>−</b>/<b>+</b> sizing.</li>
         <li><b>🧩 Tokens</b> — add a token, or one with a portrait image.</li>
         <li><b>🌫 Fog</b> — fog on/off, Reveal, Reset fog.</li>
-        <li><b>🎨 Draw</b> — freehand draw, spell templates (shape + size), clear, and weather.</li>
+        <li><b>🎨 Draw</b> — freehand draw, spell templates (shape + size), and clear.</li>
+        <li><b>🌦 Weather</b> — overlay rain, snow, or mist (or clear skies).</li>
         <li><b>💡 Lighting</b> — walls, light sources (radius), and the lighting toggle.</li>
         <li><b>🎭 Table</b> — manage players and show a handout.</li>
       </ul>
@@ -194,7 +195,7 @@ const SECTIONS = [
       </ul>` },
 
   {
-    id: "admin", title: "Admin", dm: true, body: `
+    id: "admin", title: "Admin", admin: true, body: `
       <ul>
         <li><b>Manage accounts</b> (admin) — see all accounts, change roles (Player / Game Master / Admin), reset passwords, and approve Game Master requests.</li>
         <li><b>Manage all tables</b> (admin) — view every table with its owner and delete any of them.</li>
@@ -209,6 +210,11 @@ export function initHelp() {
   const search = document.getElementById("help-search");
   if (!overlay || !nav || !content) return;
 
+  // Admin-only sections are hidden from non-admins; DM and player info stays visible to all.
+  const isAdmin = () => !!(window.account && window.account.role === "admin");
+  const allowed = (s) => !s.admin || isAdmin();
+  const badge = (s) => s.admin ? ' <span class="help-dm help-admin-badge">Admin</span>' : (s.dm ? ' <span class="help-dm">DM</span>' : "");
+
   // Build nav + content once.
   nav.innerHTML = "";
   content.innerHTML = "";
@@ -216,7 +222,7 @@ export function initHelp() {
     const link = document.createElement("button");
     link.className = "help-navlink";
     link.dataset.id = s.id;
-    link.innerHTML = `${s.title}${s.dm ? ' <span class="help-dm">DM</span>' : ""}`;
+    link.innerHTML = `${s.title}${badge(s)}`;
     link.addEventListener("click", () => {
       const el = document.getElementById("help-sec-" + s.id);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -226,17 +232,18 @@ export function initHelp() {
     const sec = document.createElement("section");
     sec.className = "help-section";
     sec.id = "help-sec-" + s.id;
-    sec.innerHTML = `<h3>${s.title}${s.dm ? ' <span class="help-dm">DM</span>' : ""}</h3>${s.body}`;
+    sec.innerHTML = `<h3>${s.title}${badge(s)}</h3>${s.body}`;
     content.appendChild(sec);
   });
 
-  // Search filters both the nav and the sections by their text.
+  // Search filters both the nav and the sections by their text, and always hides
+  // admin-only sections from non-admins (runs on open too).
   search?.addEventListener("input", () => {
     const q = search.value.trim().toLowerCase();
     SECTIONS.forEach((s) => {
       const sec = document.getElementById("help-sec-" + s.id);
       const link = nav.querySelector(`.help-navlink[data-id="${s.id}"]`);
-      const hit = !q || (s.title + " " + sec.textContent).toLowerCase().includes(q);
+      const hit = allowed(s) && (!q || (s.title + " " + sec.textContent).toLowerCase().includes(q));
       sec.style.display = hit ? "" : "none";
       if (link) link.style.display = hit ? "" : "none";
     });
