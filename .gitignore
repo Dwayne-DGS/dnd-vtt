@@ -24,6 +24,9 @@ claude.key
 # SSO / OAuth client secrets (Google, Discord) — server only, never committed
 oauth.json
 
+# Resend email API key — server only, never committed
+resend.key
+
 # The big self-contained installer is only needed for the no-GitHub method
 install-on-server.sh
 

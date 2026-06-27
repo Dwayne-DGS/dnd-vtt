@@ -50,6 +50,7 @@ function showLanding(user) {
   document.querySelector(".dash-admin").classList.toggle("hidden", !isAdmin); // hide the whole admin row for non-admins
   // Trial / subscription banner for Game Masters.
   renderTrialBanner(user);
+  renderVerifyBanner(user);
   // Players can request GM access (hidden once they're GM/admin).
   const reqBtn = document.getElementById("request-gm");
   reqBtn.classList.toggle("hidden", user.role !== "player");
@@ -322,6 +323,26 @@ function billingLabel(u) {
   return plan;
 }
 
+// Email-verification banner: prompt unverified users, or confirm after verifying.
+function renderVerifyBanner(user) {
+  const el = document.getElementById("verify-banner");
+  if (!el) return;
+  if (new URLSearchParams(location.search).get("verified") === "1") {
+    el.textContent = "✓ Email verified — thanks!"; el.className = "trial-banner ok"; return;
+  }
+  if (user && user.emailVerified === 0) {
+    el.innerHTML = 'Please verify your email to secure your account. <a href="#" id="resend-verify">Resend link</a>';
+    el.className = "trial-banner";
+    el.querySelector("#resend-verify").addEventListener("click", async (e) => {
+      e.preventDefault();
+      try { await authPost("/auth/resend-verify", {}); } catch {}
+      el.textContent = "Verification email sent — check your inbox (and spam).";
+    });
+    return;
+  }
+  el.className = "trial-banner hidden";
+}
+
 // Show GMs their trial countdown or a subscribe prompt. Players/admins see nothing.
 function renderTrialBanner(user) {
   const el = document.getElementById("trial-banner");
@@ -354,11 +375,39 @@ function startDisplay(user, room) {
   socket.connect();
   socket.emit("enterTable", { room });
 }
+const _params = new URLSearchParams(location.search);
+const _resetTok = _params.get("reset");
 fetch("/auth/me").then((r) => r.json()).then(({ user }) => {
-  if (user && _displayRoom) startDisplay(user, _displayRoom);
+  if (_resetTok) { showAuth(); showResetForm(); }
+  else if (user && _displayRoom) startDisplay(user, _displayRoom);
   else if (user) showLanding(user);
   else showAuth();
 }).catch(showAuth);
+
+// Password reset / forgot-password UI.
+function hideAuthForms() {
+  ["login-form", "signup-form", "forgot-form", "reset-form", "sso-buttons"].forEach((id) => document.getElementById(id)?.classList.add("hidden"));
+  document.querySelector("#auth-screen .mode-tabs")?.classList.add("hidden");
+}
+function showResetForm() { hideAuthForms(); document.getElementById("reset-form").classList.remove("hidden"); }
+document.getElementById("forgot-link")?.addEventListener("click", () => { document.getElementById("login-form").classList.add("hidden"); document.getElementById("forgot-form").classList.remove("hidden"); document.getElementById("auth-error").textContent = ""; });
+document.getElementById("forgot-back")?.addEventListener("click", () => { document.getElementById("forgot-form").classList.add("hidden"); document.getElementById("login-form").classList.remove("hidden"); });
+document.getElementById("forgot-btn")?.addEventListener("click", async () => {
+  const login = document.getElementById("forgot-login").value.trim();
+  if (!login) return;
+  try { await authPost("/auth/forgot", { login }); } catch {}
+  document.getElementById("forgot-form").innerHTML = '<p class="join-hint">If an account matches, we\'ve emailed a password-reset link. Check your inbox (and spam).</p>';
+});
+document.getElementById("reset-btn")?.addEventListener("click", async () => {
+  const password = document.getElementById("reset-pass").value;
+  const err = document.getElementById("auth-error");
+  try {
+    await authPost("/auth/reset", { token: _resetTok, password });
+    document.getElementById("reset-form").innerHTML = '<p class="join-hint">Password updated! You can log in now.</p>';
+    history.replaceState({}, "", "/play");
+    setTimeout(() => location.href = "/play", 1500);
+  } catch (e) { err.textContent = e.message; }
+});
 
 // Show SSO buttons only for providers configured on the server.
 fetch("/auth/providers").then((r) => r.json()).then((p) => {

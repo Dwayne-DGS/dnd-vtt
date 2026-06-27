@@ -30,6 +30,40 @@ function adminPassword() {
   } catch { return null; }
 }
 
+// --- Transactional email (Resend) -----------------------------------------
+// API key lives in `resend.key` (gitignored) or RESEND_API_KEY env. The "from"
+// address defaults to Resend's sandbox so it works for testing before you verify
+// your domain; set MAIL_FROM to e.g. "warcrimes.us <noreply@warcrimes.us>" after.
+const RESEND_KEY_FILE = join(__dirname, "resend.key");
+function resendKey() {
+  if (process.env.RESEND_API_KEY) return process.env.RESEND_API_KEY.trim();
+  try { return readFileSync(RESEND_KEY_FILE, "utf8").trim() || null; } catch { return null; }
+}
+const mailConfigured = () => !!resendKey();
+const mailFrom = () => process.env.MAIL_FROM || "warcrimes.us <onboarding@resend.dev>";
+const siteBase = () => process.env.PUBLIC_URL || "https://warcrimes.us";
+async function sendMail({ to, subject, html }) {
+  const key = resendKey();
+  if (!key || !to) { console.log("[email skipped — not configured]", subject, "→", to); return false; }
+  try {
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: mailFrom(), to, subject, html }),
+    });
+    if (!r.ok) { console.error("Resend error", r.status, (await r.text().catch(() => "")).slice(0, 200)); return false; }
+    return true;
+  } catch (e) { console.error("Resend send failed:", e.message); return false; }
+}
+function emailLayout(title, bodyHtml) {
+  return `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;margin:0 auto;color:#1a1a1a;line-height:1.6">
+    <h2 style="color:#7a1f17;font-family:Georgia,serif">${title}</h2>${bodyHtml}
+    <hr style="border:none;border-top:1px solid #e3e3e3;margin:24px 0">
+    <p style="font-size:12px;color:#999">warcrimes.us — a virtual tabletop for D&amp;D 5e. If you didn't expect this email, you can safely ignore it.</p>
+  </div>`;
+}
+const mailBtn = (url, label) => `<p><a href="${url}" style="display:inline-block;background:#c0392b;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:600">${label}</a></p><p style="font-size:12px;color:#999">Or paste this link: ${url}</p>`;
+
 app.use(express.json()); // parses application/json bodies (not the image uploads)
 // Public marketing site at "/"; the actual app lives at "/play". These routes
 // run before express.static so "/" doesn't fall through to index.html.
@@ -81,6 +115,7 @@ const pubUser = (u) => {
     plan: u.plan || null, trialEndsAt: trialEndsAt(u), trialActive: trialActive(u),
     gmEntitled: entitledGM(u), aiEntitled: entitledAI(u),
     aiUsed: Math.min(aiCostThisMonth(u), INCLUDED_AI_USD), aiIncluded: entitledAI(u) ? INCLUDED_AI_USD : 0, aiCredit: u.ai_credit || 0,
+    emailVerified: u.email_verified == null ? 1 : u.email_verified,
   };
 };
 
@@ -98,6 +133,14 @@ app.post("/auth/signup", (req, res) => {
   const finalRole = store.countUsers() === 0 ? "admin" : "player";
   const id = randomUUID();
   store.createUser({ id, username, name, email, pass_hash: bcrypt.hashSync(password, 10), role: finalRole });
+  // If email sending is configured, mark unverified and send a welcome + verify email.
+  if (mailConfigured()) {
+    store.setEmailVerified(id, 0);
+    const vtok = randomBytes(24).toString("hex");
+    store.createAuthToken(vtok, id, "verify", Date.now() + 7 * 24 * 60 * 60 * 1000);
+    sendMail({ to: email, subject: "Welcome to warcrimes.us — confirm your email",
+      html: emailLayout(`Welcome, ${name}!`, `<p>Thanks for joining warcrimes.us. Confirm your email to finish setting up your account:</p>${mailBtn(`${siteBase()}/auth/verify?token=${vtok}`, "Confirm email")}<p>Then jump in at <a href="${siteBase()}/play">${siteBase()}/play</a>.</p>`) });
+  }
   const token = randomBytes(32).toString("hex");
   store.createSession(token, id);
   setSessionCookie(res, token);
@@ -219,6 +262,49 @@ app.get("/auth/:provider/callback", async (req, res) => {
     console.error("OAuth error:", e.message);
     res.status(500).send("Sign-in failed. Please try again.");
   }
+});
+
+// --- Password reset & email verification ----------------------------------
+app.post("/auth/forgot", (req, res) => {
+  const login = String(req.body.login || "").trim().toLowerCase();
+  const user = store.getUserByUsername(login) || store.getUserByEmail(login);
+  if (user && user.email) {
+    const tok = randomBytes(24).toString("hex");
+    store.createAuthToken(tok, user.id, "reset", Date.now() + 60 * 60 * 1000); // 1 hour
+    sendMail({ to: user.email, subject: "Reset your warcrimes.us password",
+      html: emailLayout("Password reset", `<p>We received a request to reset the password for <b>${user.username}</b>. This link is good for one hour:</p>${mailBtn(`${siteBase()}/play?reset=${tok}`, "Reset password")}<p>If you didn't request this, you can ignore this email — your password won't change.</p>`) });
+  }
+  res.json({ ok: true }); // always succeed so we don't reveal which accounts exist
+});
+app.post("/auth/reset", (req, res) => {
+  const token = String(req.body.token || "");
+  const password = String(req.body.password || "");
+  if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters." });
+  const t = store.getAuthToken(token);
+  if (!t || t.kind !== "reset" || t.expires < Date.now()) return res.status(400).json({ error: "This reset link is invalid or has expired." });
+  store.setUserPassword(t.user_id, bcrypt.hashSync(password, 10));
+  store.setEmailVerified(t.user_id, 1); // using the emailed link proves the address
+  store.deleteAuthToken(token);
+  res.json({ ok: true });
+});
+app.get("/auth/verify", (req, res) => {
+  const token = String(req.query.token || "");
+  const t = store.getAuthToken(token);
+  if (!t || t.kind !== "verify" || t.expires < Date.now()) return res.redirect("/play?verified=0");
+  store.setEmailVerified(t.user_id, 1);
+  store.deleteAuthToken(token);
+  res.redirect("/play?verified=1");
+});
+app.post("/auth/resend-verify", (req, res) => {
+  const u = userFromReq(req);
+  if (!u) return res.status(401).json({ error: "Please log in first." });
+  if (!u.email_verified && u.email && mailConfigured()) {
+    const vtok = randomBytes(24).toString("hex");
+    store.createAuthToken(vtok, u.id, "verify", Date.now() + 7 * 24 * 60 * 60 * 1000);
+    sendMail({ to: u.email, subject: "Confirm your warcrimes.us email",
+      html: emailLayout("Confirm your email", `${mailBtn(`${siteBase()}/auth/verify?token=${vtok}`, "Confirm email")}`) });
+  }
+  res.json({ ok: true });
 });
 
 // Image upload (maps & token portraits). Streams the raw request body to a file
@@ -551,6 +637,12 @@ io.on("connection", (socket) => {
     if (!socket.user) return;
     store.setGmRequested(socket.user.id, 1);
     socket.emit("gmRequested");
+    // Notify every admin by email that someone wants Game Master access.
+    const who = socket.user.name || socket.user.username;
+    for (const a of store.listAdmins()) {
+      if (a.email) sendMail({ to: a.email, subject: `GM access requested by ${who}`,
+        html: emailLayout("New Game Master request", `<p><b>${who}</b> (@${socket.user.username}${socket.user.email ? `, ${socket.user.email}` : ""}) requested Game Master access.</p><p>Approve or deny it in <a href="${siteBase()}/play">Manage accounts</a>.</p>`) });
+    }
   });
 
   // The owner (or admin) manages a table's allowed player emails while in it.

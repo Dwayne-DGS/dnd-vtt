@@ -22,6 +22,17 @@
         <label>Username <input id="login-user" autocomplete="username" /></label>
         <label>Password <input id="login-pass" type="password" autocomplete="current-password" /></label>
         <button id="login-btn">Log in</button>
+        <button id="forgot-link" type="button" class="link-btn">Forgot password?</button>
+      </div>
+      <div id="forgot-form" class="hidden">
+        <label>Email or username <input id="forgot-login" autocomplete="username" /></label>
+        <button id="forgot-btn">Send reset link</button>
+        <button id="forgot-back" type="button" class="link-btn">← Back to log in</button>
+      </div>
+      <div id="reset-form" class="hidden">
+        <h3 class="dash-h" style="text-align:center;margin-bottom:10px">Set a new password</h3>
+        <label>New password <input id="reset-pass" type="password" placeholder="at least 6 characters" /></label>
+        <button id="reset-btn">Update password</button>
       </div>
       <div id="signup-form" class="hidden">
         <label>Your name <input id="signup-name" placeholder="e.g. Dwayne" /></label>
@@ -46,6 +57,7 @@
     <div class="join-card">
       <img src="/assets/warcrimes-logo.png" alt="warcrimes.us" class="brand-logo" />
       <h1 id="welcome">⚔️ D&D Virtual Tabletop</h1>
+      <div id="verify-banner" class="trial-banner hidden"></div>
       <div id="trial-banner" class="trial-banner hidden"></div>
 
       <h3 class="dash-h">Your tables</h3>
