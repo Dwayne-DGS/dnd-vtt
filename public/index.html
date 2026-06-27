@@ -40,6 +40,7 @@
     <div class="join-card">
       <img src="/assets/warcrimes-logo.png" alt="warcrimes.us" class="brand-logo" />
       <h1 id="welcome">⚔️ D&D Virtual Tabletop</h1>
+      <div id="trial-banner" class="trial-banner hidden"></div>
 
       <h3 class="dash-h">Your tables</h3>
       <div id="my-tables" class="my-tables"></div>
@@ -277,16 +278,18 @@
         <!-- Chat + dice -->
         <div id="tab-chat" class="tab-panel active">
           <div id="chat-log" class="chat-log"></div>
-          <div id="macro-bar" class="macro-bar"></div>
-          <div class="roll-mods">
-            <button id="mod-adv" title="Roll twice, keep the higher">Advantage</button>
-            <button id="mod-dis" title="Roll twice, keep the lower">Disadvantage</button>
-            <button id="mod-secret" title="Only you and the DM see the result">🔒 Secret</button>
-          </div>
-          <div class="dice-bar" id="dice-bar"></div>
-          <div class="chat-input">
-            <input id="chat-text" placeholder="Message, or roll like 2d6+3…" />
-            <button id="chat-send">Send</button>
+          <div class="chat-compose">
+            <div class="chat-input">
+              <input id="chat-text" placeholder="Message, or roll like 2d6+3…" />
+              <button id="chat-send">Send</button>
+            </div>
+            <div id="macro-bar" class="macro-bar"></div>
+            <div class="roll-mods">
+              <button id="mod-adv" title="Roll twice, keep the higher">Advantage</button>
+              <button id="mod-dis" title="Roll twice, keep the lower">Disadvantage</button>
+              <button id="mod-secret" title="Only you and the DM see the result">🔒 Secret</button>
+            </div>
+            <div class="dice-bar" id="dice-bar"></div>
           </div>
         </div>
 
@@ -354,6 +357,7 @@
 
         <!-- AI assistant -->
         <div id="tab-ai" class="tab-panel">
+          <div id="ai-upsell" class="ai-upsell hidden">✨ The AI assistant is part of the <b>GM + AI</b> plan. <a href="/pricing.html" target="_blank">See plans</a> — or it's included free during your Game Master trial.</div>
           <p class="join-hint">Describe what you want and let the AI build it. Characters save to the PCs tab; monsters/NPCs save to the Bestiary.</p>
           <textarea id="ai-prompt" rows="4" placeholder="e.g. A half-orc barbarian, level 3, who grew up on a pirate ship… &#10;or: How does grappling work? &#10;or: Give me a spooky roadside encounter for 4 level-2 PCs."></textarea>
           <div class="ai-actions">

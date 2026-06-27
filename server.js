@@ -48,11 +48,31 @@ function setSessionCookie(res, token) {
   res.setHeader("Set-Cookie", `vtt_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`);
 }
 function userFromReq(req) { return store.getSessionUser(parseCookies(req.headers.cookie)["vtt_session"]); }
+
+// --- Billing / entitlements -----------------------------------------------
+const TRIAL_DAYS = 30;
+const TRIAL_MS = TRIAL_DAYS * 24 * 60 * 60 * 1000;
+const AI_MONTHLY_CAP = 200; // fair-use limit on AI actions per GM per month
+const trialActive = (u) => !!(u && u.trial_start && Date.now() - u.trial_start < TRIAL_MS);
+const trialEndsAt = (u) => (u && u.trial_start ? u.trial_start + TRIAL_MS : null);
+// Can this account run tables as a DM? Admins always; GMs during trial or on a paid plan.
+const entitledGM = (u) => !!(u && (u.role === "admin" || (u.role === "gm" && (u.plan === "gm" || u.plan === "gm_ai" || trialActive(u)))));
+// Can this account use the AI assistant? Admins always; the AI plan, or during trial.
+const entitledAI = (u) => !!(u && (u.role === "admin" || u.plan === "gm_ai" || trialActive(u)));
+// One-time migration: existing GM accounts (created before billing) get a fresh
+// 30-day trial start so the new gating never locks them out unexpectedly.
+try { store.listUsers().forEach((u) => { if (u.role === "gm") store.startTrial(u.id); }); } catch {}
+
 const pubUser = (u) => {
   if (!u) return null;
   let macros = [];
   try { macros = JSON.parse(u.macros || "[]"); } catch {}
-  return { username: u.username, role: u.role, name: u.name || null, gmRequested: !!u.gm_requested, diceSkin: u.dice_skin || "galaxy", dice3d: u.dice3d == null ? 1 : u.dice3d, macros };
+  return {
+    username: u.username, role: u.role, name: u.name || null, gmRequested: !!u.gm_requested,
+    diceSkin: u.dice_skin || "galaxy", dice3d: u.dice3d == null ? 1 : u.dice3d, macros,
+    plan: u.plan || null, trialEndsAt: trialEndsAt(u), trialActive: trialActive(u),
+    gmEntitled: entitledGM(u), aiEntitled: entitledAI(u),
+  };
 };
 
 app.post("/auth/signup", (req, res) => {
@@ -245,6 +265,9 @@ io.on("connection", (socket) => {
     if (!["gm", "admin"].includes(socket.user.role)) {
       return socket.emit("joinError", "Only Game Master accounts can create tables.");
     }
+    if (!entitledGM(store.getUserById(socket.user.id))) {
+      return socket.emit("joinError", "Your Game Master trial has ended. Subscribe to keep creating and running tables.");
+    }
     roomId = (room || "").trim().toLowerCase();
     if (!roomId) return socket.emit("joinError", "Please enter a table name.");
     const existing = store.getRoom(roomId);
@@ -267,6 +290,9 @@ io.on("connection", (socket) => {
     const allowed = owner || socket.user.role === "admin" ||
       store.isMember(roomId, socket.user.id) || store.isEmailAllowed(roomId, socket.user.email);
     if (!allowed) return socket.emit("joinError", "You're not on this table yet — ask your GM to add your email, or use the invite password.");
+    if (owner && !entitledGM(store.getUserById(socket.user.id))) {
+      return socket.emit("joinError", "Your Game Master trial has ended — subscribe to run your tables again.");
+    }
     enterRoom(owner);
   });
 
@@ -277,7 +303,10 @@ io.on("connection", (socket) => {
     if (!roomId) return socket.emit("joinError", "Please enter a table name.");
     const r = store.getRoom(roomId);
     if (!r) return socket.emit("joinError", "No table with that name. Ask your GM for it.");
-    if (r.owner_id === socket.user.id) return enterRoom(true);
+    if (r.owner_id === socket.user.id) {
+      if (!entitledGM(store.getUserById(socket.user.id))) return socket.emit("joinError", "Your Game Master trial has ended — subscribe to run your tables again.");
+      return enterRoom(true);
+    }
     if (store.isEmailAllowed(roomId, socket.user.email)) return enterRoom(false); // on the allow-list
     const ppw = r.player_password || "";
     if (ppw) {
@@ -470,6 +499,20 @@ io.on("connection", (socket) => {
     if ((mode === "creature" || mode === "story") && !amDM()) {
       return socket.emit("aiError", "Only the DM can use that.");
     }
+    // Entitlement: the AI assistant is part of the GM + AI plan (or the free trial).
+    const me = socket.user ? store.getUserById(socket.user.id) : null;
+    if (!entitledAI(me)) {
+      return socket.emit("aiError", "✨ The AI assistant is part of the GM + AI plan. Upgrade (or start your free trial) to use it.");
+    }
+    // Monthly fair-use cap (admins exempt) — keeps API costs predictable.
+    if (me.role !== "admin") {
+      const period = new Date().toISOString().slice(0, 7); // YYYY-MM
+      const used = me.ai_period === period ? (me.ai_used || 0) : 0;
+      if (used >= AI_MONTHLY_CAP) {
+        return socket.emit("aiError", `You've reached this month's limit of ${AI_MONTHLY_CAP} AI actions. It resets next month.`);
+      }
+      store.setAiUsage(me.id, used + 1, period);
+    }
     const now = Date.now();
     if (now - aiLast < 3000) return socket.emit("aiError", "Please wait a few seconds between AI requests.");
     aiLast = now;
@@ -511,6 +554,7 @@ io.on("connection", (socket) => {
     return store.listUsers().map((u) => ({
       id: u.id, username: u.username, name: u.name, email: u.email, role: u.role,
       gm_requested: u.gm_requested, created_at: u.created_at, is_super: u.id === sid,
+      plan: u.plan || null, trialActive: trialActive(u), trialEndsAt: trialEndsAt(u),
       tables: store.getUserTables(u.id, u.email),
     }));
   };
@@ -528,6 +572,15 @@ io.on("connection", (socket) => {
       return socket.emit("adminError", "Can't remove the last admin.");
     store.setUserRole(id, role);
     store.setGmRequested(id, 0); // any pending GM request is now resolved
+    if (role === "gm") store.startTrial(id); // begin the 30-day GM trial (no-op if already started)
+    socket.emit("adminUserList", userListPayload());
+  });
+  // Admin manually sets a billing plan (until Stripe is wired): null | 'gm' | 'gm_ai'.
+  socket.on("adminSetPlan", ({ id, plan }) => {
+    if (!isAdmin()) return socket.emit("adminError", "Admins only.");
+    if (![null, "", "gm", "gm_ai"].includes(plan)) return;
+    if (!store.getUserById(id)) return;
+    store.setPlan(id, plan || null);
     socket.emit("adminUserList", userListPayload());
   });
   socket.on("adminDenyGm", (id) => {

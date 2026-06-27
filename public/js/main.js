@@ -47,6 +47,8 @@ function showLanding(user) {
   document.getElementById("accounts-link").classList.toggle("hidden", !isAdmin);
   document.getElementById("tables-admin-link").classList.toggle("hidden", !isAdmin);
   document.querySelector(".dash-admin").classList.toggle("hidden", !isAdmin); // hide the whole admin row for non-admins
+  // Trial / subscription banner for Game Masters.
+  renderTrialBanner(user);
   // Players can request GM access (hidden once they're GM/admin).
   const reqBtn = document.getElementById("request-gm");
   reqBtn.classList.toggle("hidden", user.role !== "player");
@@ -225,6 +227,7 @@ socket.on("adminUserList", (users) => {
         <div class="ar-name">${escAcct(u.name || u.username)} <span class="ar-meta">@${escAcct(u.username)}</span>${ownerBadge}${reqBadge}</div>
         <div class="ar-meta">${escAcct(u.email || "no email")} · joined ${fmtDate(u.created_at)}</div>
         <div class="ar-meta">tables: ${tables}</div>
+        <div class="ar-meta">${billingLabel(u)}</div>
       </div>
       <div class="acct-controls">
         ${u.gm_requested ? '<button class="acct-approve">✓ Make GM</button><button class="acct-deny btn-secondary">Deny</button>' : ""}
@@ -233,11 +236,17 @@ socket.on("adminUserList", (users) => {
           <option value="gm"${u.role === "gm" ? " selected" : ""}>Game Master</option>
           <option value="admin"${u.role === "admin" ? " selected" : ""}>Admin</option>
         </select>
+        <select class="acct-plan" title="Billing plan (manual until Stripe)"${locked ? " disabled" : ""}>
+          <option value=""${!u.plan ? " selected" : ""}>Plan: trial / none</option>
+          <option value="gm"${u.plan === "gm" ? " selected" : ""}>Plan: GM ($5)</option>
+          <option value="gm_ai"${u.plan === "gm_ai" ? " selected" : ""}>Plan: GM + AI ($10)</option>
+        </select>
         ${locked ? '<span class="ar-meta">owner account — managed by the owner only</span>'
           : '<button class="acct-reset btn-secondary">Reset password</button><button class="acct-del">Delete</button>'}
       </div>`;
     if (!locked) {
       row.querySelector(".acct-role").addEventListener("change", (e) => socket.emit("adminSetRole", { id: u.id, role: e.target.value }));
+      row.querySelector(".acct-plan").addEventListener("change", (e) => socket.emit("adminSetPlan", { id: u.id, plan: e.target.value }));
       row.querySelector(".acct-reset").addEventListener("click", () => {
         const np = prompt(`New password for "${u.username}" (at least 6 characters):`);
         if (np) socket.emit("adminResetPassword", { id: u.id, newPassword: np });
@@ -274,6 +283,37 @@ socket.on("allowedEmails", (emails) => {
   });
 });
 function escAcct(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+// Short billing status for the admin accounts list.
+function billingLabel(u) {
+  if (u.plan === "gm_ai") return "💳 Plan: GM + AI ($10)";
+  if (u.plan === "gm") return "💳 Plan: GM ($5)";
+  if (u.trialActive && u.trialEndsAt) {
+    const d = Math.max(0, Math.ceil((u.trialEndsAt - Date.now()) / 86400000));
+    return `⏳ Trial: ${d} day${d === 1 ? "" : "s"} left`;
+  }
+  if (u.trialEndsAt) return "Trial ended — no plan";
+  return "No plan / trial";
+}
+
+// Show GMs their trial countdown or a subscribe prompt. Players/admins see nothing.
+function renderTrialBanner(user) {
+  const el = document.getElementById("trial-banner");
+  if (!el) return;
+  el.className = "trial-banner hidden";
+  if (!user || user.role !== "gm") return; // players & admins don't need it
+  if (user.plan === "gm_ai") { el.textContent = "✓ Game Master + AI plan active. Thanks for supporting the table!"; el.className = "trial-banner ok"; return; }
+  if (user.plan === "gm") { el.innerHTML = '✓ Game Master plan active. Add the AI assistant any time — <a href="/pricing.html" target="_blank">see plans</a>.'; el.className = "trial-banner ok"; return; }
+  if (user.trialActive && user.trialEndsAt) {
+    const days = Math.max(0, Math.ceil((user.trialEndsAt - Date.now()) / 86400000));
+    el.innerHTML = `⏳ <b>${days} day${days === 1 ? "" : "s"} left</b> in your free Game Master trial (everything unlocked, including AI). <a href="/pricing.html" target="_blank">See plans</a>`;
+    el.className = "trial-banner";
+    return;
+  }
+  // Trial ended, no plan.
+  el.innerHTML = 'Your Game Master trial has ended. <a href="/pricing.html" target="_blank">Subscribe</a> to keep creating and running tables.';
+  el.className = "trial-banner ended";
+}
 
 // On load, find out if we're already logged in.
 fetch("/auth/me").then((r) => r.json()).then(({ user }) => { if (user) showLanding(user); else showAuth(); }).catch(showAuth);
@@ -419,6 +459,9 @@ function enterApp(room) {
   initLoot(socket);
   initTimer(socket);
   initDice3d(socket);
+  // Show the AI upsell in the AI tab if this account isn't entitled to the assistant.
+  const aiUp = document.getElementById("ai-upsell");
+  if (aiUp) aiUp.classList.toggle("hidden", !!(window.account && window.account.aiEntitled));
 
   // Handouts — DM shows an image to everyone.
   const handoutOverlay = document.getElementById("handout-overlay");
