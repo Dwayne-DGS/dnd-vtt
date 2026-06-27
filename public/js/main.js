@@ -19,6 +19,7 @@ import { initTimer } from "./timer.js";
 import { initDice3d, setDice3dEnabled } from "./dice3d.js";
 import { initHelp } from "./help.js";
 import { initTooltips } from "./tooltip.js";
+import { initFinder } from "./finder.js";
 
 const socket = io({ autoConnect: false });
 
@@ -484,6 +485,7 @@ function enterApp(room) {
   initLoot(socket);
   initTimer(socket);
   initDice3d(socket);
+  initFinder(socket);
   // Show the AI upsell in the AI tab if this account isn't entitled to the assistant.
   const aiUp = document.getElementById("ai-upsell");
   if (aiUp) aiUp.classList.toggle("hidden", !!(window.account && window.account.aiEntitled));

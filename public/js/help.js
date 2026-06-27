@@ -100,6 +100,15 @@ const SECTIONS = [
       <p>Lighting is off by default so it never interferes with normal play.</p>` },
 
   {
+    id: "finder", title: "Find maps & music", dm: true, body: `
+      <p>Short on assets? Use <b>🔎 Find maps</b> (in the 🗺 Map menu) and <b>🔎 Find music &amp; SFX</b> (in the FX tab's soundboard) to search free, openly-licensed (Creative-Commons) libraries.</p>
+      <ul>
+        <li>Type a description — "snowy forest road", "creepy dungeon ambience" — and Search.</li>
+        <li><b>Preview</b> each result (image thumbnail or audio player), then <b>Add</b> it to your map library or soundboard. Maps also have <b>Use now</b>.</li>
+        <li>Each result shows its <b>license and creator</b> — some licenses ask you to credit the creator if you reuse the asset publicly.</li>
+      </ul>` },
+
+  {
     id: "weather", title: "Weather effects", dm: true, body: `
       <p>The <b>weather dropdown</b> overlays animated rain, snow, or mist on the map for everyone (or clear skies to turn it off).</p>` },
 

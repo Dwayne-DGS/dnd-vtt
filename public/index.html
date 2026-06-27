@@ -164,6 +164,7 @@
               <select id="map-picker" title="Saved maps (shared library)"><option value="">— saved maps —</option></select>
               <button id="map-remove" class="btn-secondary" title="Remove the selected saved map from the library">🗑</button>
             </div>
+            <button id="find-maps" class="btn-secondary" data-tip="Search Creative-Commons maps to add">🔎 Find maps</button>
             <div class="menu-label">Set a map</div>
             <input id="map-url" placeholder="Paste a map image URL…" />
             <div class="menu-row">
@@ -343,6 +344,7 @@
           <p class="join-hint">The helper reports its address automatically when it connects. You can override it here if needed (saved in this browser).</p>
           <h3 class="dash-h" style="margin-top:16px">Soundboard</h3>
           <p class="join-hint">Add ambient loops or sound effects (upload a file or paste a URL), then play them for the whole table.</p>
+          <button id="find-sounds" class="btn-secondary" data-tip="Search Creative-Commons music & SFX to add" style="margin-bottom:8px">🔎 Find music &amp; SFX</button>
           <div class="snd-add">
             <input id="snd-name" placeholder="Name (e.g. Tavern)" />
             <input id="snd-url" placeholder="audio URL, or upload →" />
@@ -465,6 +467,24 @@
         <nav id="help-nav" class="help-nav"></nav>
         <div id="help-content" class="help-content"></div>
       </div>
+    </div>
+  </div>
+  <div id="finder-overlay" class="finder-overlay hidden">
+    <div class="finder-wrap">
+      <div class="finder-head">
+        <h2 id="finder-title">Find maps</h2>
+        <div class="finder-tabs">
+          <button id="finder-maps-tab" class="btn-secondary">🗺 Maps</button>
+          <button id="finder-sounds-tab" class="btn-secondary">🔊 Sounds</button>
+        </div>
+        <button id="finder-close" class="btn-secondary">Close</button>
+      </div>
+      <div class="finder-search">
+        <input id="finder-q" placeholder="Describe it — e.g. “snowy forest road” or “creepy dungeon ambience”" />
+        <button id="finder-go">Search</button>
+      </div>
+      <p class="finder-note">Results come from Creative-Commons libraries (Openverse). Each shows its license — some require crediting the creator. Preview, then add to your table.</p>
+      <div id="finder-results" class="finder-results"></div>
     </div>
   </div>
   <div id="sheet-modal" class="sheet-modal hidden"></div>

@@ -865,6 +865,21 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("creatureDeleted", id);
   });
 
+  // --- Asset finder: search Creative-Commons libraries for maps & audio ----
+  // DM types a description; we search Openverse (no key needed) for openly-
+  // licensed images/audio they can preview and add. "Add" reuses saveMap/saveSound.
+  socket.on("findAssets", async ({ kind, query }) => {
+    if (!roomId || !amDM()) return;
+    const q = String(query || "").trim().slice(0, 120);
+    if (!q) return socket.emit("assetResults", { kind, items: [], error: "Type what you're looking for." });
+    try {
+      const items = await searchOpenverse(kind === "sounds" ? "audio" : "images", q);
+      socket.emit("assetResults", { kind, items });
+    } catch (e) {
+      socket.emit("assetResults", { kind, items: [], error: "Search failed: " + (e.message || "try again") });
+    }
+  });
+
   // --- Saved maps — shared library, DM only --------------------------------
   // Broadcast library changes to ALL clients (every room) so the shared library
   // stays consistent everywhere.
@@ -1043,6 +1058,33 @@ const CREATURE_TOOL = {
     required: ["name", "kind", "armor_class", "hit_points", "abilities"],
   },
 };
+
+// Search Openverse (openverse.org) for Creative-Commons, commercially-usable
+// images or audio. No API key required. Returns a tidy list for the asset finder.
+async function searchOpenverse(media, query) {
+  const hint = media === "audio" ? "ambience loop" : "fantasy battle map";
+  const url = `https://api.openverse.org/v1/${media}/?q=${encodeURIComponent(query + " " + hint)}` +
+    `&page_size=18&mature=false&license_type=commercial`;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 12000);
+  let res;
+  try {
+    res = await fetch(url, { headers: { "User-Agent": "warcrimes-vtt/1.0 (+https://warcrimes.us)" }, signal: ctl.signal });
+  } catch (e) {
+    throw new Error(e.name === "AbortError" ? "the search service timed out" : "couldn't reach the search service");
+  } finally { clearTimeout(timer); }
+  if (!res.ok) throw new Error("search service returned " + res.status);
+  const data = await res.json();
+  return (data.results || []).map((r) => ({
+    title: (r.title || "Untitled").slice(0, 80),
+    by: r.creator || r.source || "",
+    license: ((r.license || "").toUpperCase() + (r.license_version ? " " + r.license_version : "")).trim(),
+    source: r.foreign_landing_url || r.url || "",
+    media: r.url || "",
+    thumb: r.thumbnail || r.url || "",
+    duration: Math.round((r.duration || 0) / 1000), // ms → s (audio)
+  })).filter((x) => x.media);
+}
 
 async function callClaude({ system, prompt, tool }) {
   const key = claudeKey();
