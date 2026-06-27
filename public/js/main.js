@@ -17,6 +17,7 @@ import { initJournal } from "./journal.js";
 import { initLoot } from "./loot.js";
 import { initTimer } from "./timer.js";
 import { initDice3d, setDice3dEnabled } from "./dice3d.js";
+import { initHelp } from "./help.js";
 
 const socket = io({ autoConnect: false });
 
@@ -86,6 +87,7 @@ function openSettings() {
   settingsOverlay.classList.remove("hidden");
 }
 
+initHelp(); // Help & Guide overlay (buttons exist on both the dashboard and the in-game top bar).
 document.getElementById("request-gm").addEventListener("click", () => { socket.connect(); socket.emit("requestGm"); });
 socket.on("gmRequested", () => {
   const b = document.getElementById("request-gm");

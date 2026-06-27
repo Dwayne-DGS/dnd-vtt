@@ -66,6 +66,7 @@
       </div>
 
       <button id="settings-link" class="link-btn">⚙ Settings</button>
+      <button id="help-link" class="link-btn">❔ Help &amp; guide</button>
       <button id="request-gm" class="link-btn hidden">Request Game Master access</button>
       <button id="accounts-link" class="link-btn hidden">Manage accounts (admin)</button>
       <button id="admin-link" class="link-btn">Manage rooms (owner)</button>
@@ -139,6 +140,7 @@
         <button id="players-btn" class="btn-secondary dm-only" title="Manage who can join this table">👥 Players</button>
         <button id="handout-btn" class="btn-secondary dm-only" title="Show an image to all players">🖼 Show</button>
         <button id="mute-btn" class="btn-secondary" title="Mute sounds">🔊</button>
+        <button id="help-btn" class="btn-secondary" title="Help &amp; guide">❔ Help</button>
         <button id="logout-btn" class="btn-secondary" title="Log out">⎋ Log out</button>
         <input type="file" id="handout-file" accept="image/*" hidden />
         <button id="add-token" class="dm-only">+ Token</button>
@@ -371,6 +373,19 @@
     </div>
   </div>
   <audio id="ambient" loop></audio>
+  <div id="help-overlay" class="help-overlay hidden">
+    <div class="help-card">
+      <div class="help-head">
+        <h2>📖 Help &amp; Guide</h2>
+        <input id="help-search" placeholder="Search help…" />
+        <button id="help-close" class="btn-secondary">Close</button>
+      </div>
+      <div class="help-body">
+        <nav id="help-nav" class="help-nav"></nav>
+        <div id="help-content" class="help-content"></div>
+      </div>
+    </div>
+  </div>
   <div id="sheet-modal" class="sheet-modal hidden"></div>
   <div id="token-menu" class="token-menu hidden"></div>
 

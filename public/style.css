@@ -455,6 +455,27 @@ body.is-player .dm-only { display: none !important; }
 .set-toggle { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--ink); margin: 4px 0 14px; line-height: 1.4; cursor: pointer; }
 .set-toggle input { margin-top: 2px; }
 
+/* Help & Guide overlay */
+.help-overlay { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.help-overlay.hidden { display: none; }
+.help-card { background: var(--panel); border: 1px solid var(--gold); border-radius: 14px; width: min(920px, 96vw); height: min(80vh, 760px); display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,0.6); overflow: hidden; }
+.help-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border-2); }
+.help-head h2 { margin: 0; color: var(--gold-2); font-size: 19px; white-space: nowrap; }
+.help-head #help-search { flex: 1; }
+.help-body { display: flex; flex: 1; min-height: 0; }
+.help-nav { width: 220px; flex: 0 0 auto; overflow-y: auto; border-right: 1px solid var(--border-2); padding: 10px; background: var(--bg-2); }
+.help-navlink { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; background: transparent; border: none; color: var(--ink); padding: 7px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.help-navlink:hover { background: var(--panel-3); color: var(--gold-2); }
+.help-content { flex: 1; overflow-y: auto; padding: 6px 22px 28px; scroll-behavior: smooth; }
+.help-section { padding-top: 18px; }
+.help-section h3 { color: var(--gold-2); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.help-section p { line-height: 1.6; }
+.help-section ul { line-height: 1.65; padding-left: 20px; }
+.help-section li { margin: 4px 0; }
+.help-section code { background: var(--panel-3); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+.help-dm { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; background: var(--accent); color: #fff; padding: 1px 6px; border-radius: 10px; }
+@media (max-width: 640px) { .help-nav { display: none; } }
+
 /* Hue helper locator (FX tab) */
 .hue-status { font-size: 13px; margin: 4px 0 8px; }
 .hue-status.ok { color: #7fd99a; }
