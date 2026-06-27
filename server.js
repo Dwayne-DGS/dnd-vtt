@@ -56,13 +56,30 @@ async function sendMail({ to, subject, html }) {
   } catch (e) { console.error("Resend send failed:", e.message); return false; }
 }
 function emailLayout(title, bodyHtml) {
-  return `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;margin:0 auto;color:#1a1a1a;line-height:1.6">
-    <h2 style="color:#7a1f17;font-family:Georgia,serif">${title}</h2>${bodyHtml}
-    <hr style="border:none;border-top:1px solid #e3e3e3;margin:24px 0">
-    <p style="font-size:12px;color:#999">warcrimes.us — a virtual tabletop for D&amp;D 5e. If you didn't expect this email, you can safely ignore it.</p>
-  </div>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f2ee;margin:0;padding:24px 0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <tr><td align="center">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:92%;background:#ffffff;border:1px solid #e4ddd0;border-radius:12px;overflow:hidden">
+      <tr><td align="center" style="background:#16110b;padding:24px 0">
+        <img src="${siteBase()}/assets/warcrimes-logo.png" alt="warcrimes.us" width="240" style="display:block;width:240px;max-width:72%;height:auto" />
+      </td></tr>
+      <tr><td style="padding:32px 38px;color:#262626;line-height:1.65;font-size:15px">
+        <h1 style="margin:0 0 16px;font-family:Georgia,'Times New Roman',serif;color:#7a1f17;font-size:23px">${title}</h1>
+        ${bodyHtml}
+      </td></tr>
+      <tr><td style="padding:16px 38px 26px;border-top:1px solid #eee;color:#9a9a9a;font-size:12px;line-height:1.55">
+        <a href="${siteBase()}" style="color:#7a1f17;text-decoration:none;font-weight:bold">warcrimes.us</a> — your own virtual tabletop for Dungeons &amp; Dragons 5th Edition.<br>
+        If you didn't expect this email, you can safely ignore it.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>`;
 }
-const mailBtn = (url, label) => `<p><a href="${url}" style="display:inline-block;background:#c0392b;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:600">${label}</a></p><p style="font-size:12px;color:#999">Or paste this link: ${url}</p>`;
+const mailBtn = (url, label) => `
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0"><tr>
+  <td align="center" bgcolor="#c0392b" style="border-radius:8px">
+    <a href="${url}" style="display:inline-block;padding:13px 28px;color:#ffffff;font-weight:bold;font-size:15px;text-decoration:none">${label}</a>
+  </td></tr></table>
+<p style="font-size:12px;color:#9a9a9a;word-break:break-all;margin:0">Or paste this link into your browser:<br><a href="${url}" style="color:#7a1f17">${url}</a></p>`;
 
 app.use(express.json()); // parses application/json bodies (not the image uploads)
 // Public marketing site at "/"; the actual app lives at "/play". These routes
