@@ -342,7 +342,23 @@ function renderTrialBanner(user) {
 }
 
 // On load, find out if we're already logged in.
-fetch("/auth/me").then((r) => r.json()).then(({ user }) => { if (user) showLanding(user); else showAuth(); }).catch(showAuth);
+// "Table View" — a second screen (TV/projector) that shows only the map, exactly
+// as players should see it, with no controls. Opened via /play?display=<room>.
+const _displayRoom = new URLSearchParams(location.search).get("display");
+function startDisplay(user, room) {
+  window.account = user;
+  window.tableView = true;                       // map renders as a player, view-only
+  document.body.classList.add("table-display");  // CSS hides all the chrome
+  document.getElementById("auth-screen").classList.add("hidden");
+  document.getElementById("join-screen").classList.add("hidden");
+  socket.connect();
+  socket.emit("enterTable", { room });
+}
+fetch("/auth/me").then((r) => r.json()).then(({ user }) => {
+  if (user && _displayRoom) startDisplay(user, _displayRoom);
+  else if (user) showLanding(user);
+  else showAuth();
+}).catch(showAuth);
 
 // Role is decided by the server from the DM password. We mirror it to the body
 // class (CSS hides .dm-only controls for players) and to window.isDM /
@@ -353,9 +369,12 @@ window.playerName = "Player";
 let entered = false;
 
 function setRole(isDM, name) {
-  window.isDM = !!isDM;
+  // On the Table View screen we always render as a player (fog/lighting hide what
+  // players shouldn't see), even though the account itself is the DM.
+  const eff = !!isDM && !window.tableView;
+  window.isDM = eff;
   window.playerName = name;
-  document.body.classList.toggle("is-player", !isDM);
+  document.body.classList.toggle("is-player", !eff);
   const badge = document.getElementById("role-badge");
   badge.textContent = isDM ? "DM" : "Player";
   badge.className = "role-badge " + (isDM ? "dm" : "player");
@@ -367,6 +386,17 @@ socket.on("role", ({ isDM, name, room }) => {
   if (!entered) { entered = true; enterApp(room); }
 });
 socket.on("joinError", (msg) => alert(msg || "Could not join that table."));
+
+// Open the player-facing Table View (for a TV/second screen) for the current table.
+document.getElementById("table-view")?.addEventListener("click", () => {
+  if (!window.currentRoom) return;
+  window.open("/play?display=" + encodeURIComponent(window.currentRoom), "_blank", "noopener");
+});
+// Fullscreen toggle (shown only on the Table View screen).
+document.getElementById("tv-fullscreen")?.addEventListener("click", () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen?.();
+});
 
 // Landing screen: toggle between Join and Create.
 const joinForm = document.getElementById("join-form");
@@ -464,6 +494,7 @@ function escapeHtml(s) {
 }
 
 function enterApp(room) {
+  window.currentRoom = room;
   document.getElementById("room-label").textContent = `Room: ${room}`;
   joinScreen.classList.add("hidden");
   app.classList.remove("hidden");

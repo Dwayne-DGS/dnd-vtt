@@ -109,6 +109,15 @@ const SECTIONS = [
       </ul>` },
 
   {
+    id: "tableview", title: "Table View (2nd screen / TV)", dm: true, body: `
+      <p>Playing in person? Open <b>🎭 Table → 📺 Table view</b>. It opens a new browser window showing <b>only the map</b> — no toolbar, no chat, no DM secrets — exactly as your players should see it (fog and lighting hide the unrevealed parts).</p>
+      <ul>
+        <li>Drag that window onto your TV or second monitor and click <b>⛶ Fullscreen</b>.</li>
+        <li>Keep running the game on your laptop as usual — the table screen mirrors it live (tokens, fog, lighting, weather).</li>
+        <li>The table screen is view-only and never shows dice rolls, so your secret rolls stay secret.</li>
+      </ul>` },
+
+  {
     id: "weather", title: "Weather effects", dm: true, body: `
       <p>The <b>weather dropdown</b> overlays animated rain, snow, or mist on the map for everyone (or clear skies to turn it off).</p>` },
 

@@ -272,6 +272,7 @@ export function initMap(socket) {
   // --- interaction ---------------------------------------------------------
   canvas.addEventListener("mousedown", (e) => {
     const p = pos(e), w = toWorld(p);
+    if (window.tableView) { panning = true; panStart = p; return; } // Table View: pan only, no editing
     if (measureMode) { ruler = { x1: p.x, y1: p.y, x2: p.x, y2: p.y }; return; }
     if (e.altKey) { sendPing(w); return; }
     if (drawMode && window.isDM) { const r = mapRect(); stroke = { pts: [norm(w, r)], color: "#e4c884", w: 2.5 }; return; }

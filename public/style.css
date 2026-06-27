@@ -472,6 +472,20 @@ body.is-player .player-note { display: block; }
    Permission gating + animations
    ============================================================ */
 body.is-player .dm-only { display: none !important; }
+
+/* Table View — second-screen / TV display: just the map, no chrome. */
+#tv-fullscreen { display: none; }
+body.table-display .topbar,
+body.table-display .tool-rail,
+body.table-display .sidebar,
+body.table-display .hint,
+body.table-display #turn-timer { display: none !important; }
+body.table-display .layout { height: 100vh; }
+body.table-display #tv-fullscreen {
+  display: block; position: fixed; bottom: 14px; right: 16px; z-index: 70;
+  opacity: 0.35; font-size: 13px; transition: opacity .15s;
+}
+body.table-display #tv-fullscreen:hover { opacity: 1; }
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 

@@ -269,6 +269,7 @@ export function initDice3d(s) {
   if (window.account && window.account.dice3d != null) enabled = !!window.account.dice3d;
   window.dice3dActive = dice3dActive();
   socket.on("chat", (m) => {
+    if (window.tableView) return; // never show dice (incl. secret rolls) on the player-facing screen
     if (m.type === "roll" && m.who === window.playerName && Array.isArray(m.dice) && m.dice.length) {
       roll3D(m.dice);
     }
