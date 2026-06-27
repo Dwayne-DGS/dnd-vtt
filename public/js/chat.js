@@ -39,9 +39,7 @@ export function initChat(socket) {
   send.addEventListener("click", submit);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
 
-  document.querySelectorAll(".dice-bar button").forEach((btn) => {
-    btn.addEventListener("click", () => socket.emit("roll", btn.dataset.die));
-  });
+  // (Dice-bar buttons + their roll animation are handled in dice.js.)
 
   socket.on("chat", append);
 }

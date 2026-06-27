@@ -166,14 +166,7 @@
         <!-- Chat + dice -->
         <div id="tab-chat" class="tab-panel active">
           <div id="chat-log" class="chat-log"></div>
-          <div class="dice-bar">
-            <button data-die="d20">d20</button>
-            <button data-die="d12">d12</button>
-            <button data-die="d10">d10</button>
-            <button data-die="d8">d8</button>
-            <button data-die="d6">d6</button>
-            <button data-die="d4">d4</button>
-          </div>
+          <div class="dice-bar" id="dice-bar"></div>
           <div class="chat-input">
             <input id="chat-text" placeholder="Message, or roll like 2d6+3…" />
             <button id="chat-send">Send</button>
@@ -258,6 +251,7 @@
   </div>
 
   <div id="fx-flash" class="fx-flash"></div>
+  <div id="dice-anim" class="dice-anim hidden"></div>
   <div id="sheet-modal" class="sheet-modal hidden"></div>
   <div id="token-menu" class="token-menu hidden"></div>
 

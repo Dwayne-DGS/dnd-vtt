@@ -206,8 +206,24 @@ select { cursor: pointer; }
 .msg.roll .total { font-weight: 800; font-size: 17px; color: var(--gold-2); }
 .msg .detail { color: var(--muted); font-size: 12px; margin-top: 2px; }
 .dice-bar { display: flex; gap: 6px; margin: 12px 0; flex-wrap: wrap; }
-.dice-bar button { flex: 1; min-width: 44px; background: linear-gradient(180deg, var(--panel-3), var(--panel-2)); border: 1px solid var(--border-2); color: var(--ink); padding: 10px 0; box-shadow: none; }
-.dice-bar button:hover { border-color: var(--gold); color: var(--gold-2); }
+.die-btn { flex: 1; min-width: 46px; background: linear-gradient(180deg, var(--panel-3), var(--panel-2)); border: 1px solid var(--border-2); padding: 6px 0; box-shadow: none; }
+.die-btn:hover { border-color: var(--gold); }
+.die-svg { width: 36px; height: 36px; display: block; margin: 0 auto; }
+.die-svg polygon { fill: var(--panel); stroke: var(--gold); stroke-width: 4; stroke-linejoin: round; }
+.die-btn:hover .die-svg polygon { fill: var(--accent); stroke: var(--gold-2); }
+.die-svg .die-num { fill: var(--ink); font: 700 24px var(--font); }
+.die-btn:hover .die-svg .die-num { fill: #fff; }
+
+/* On-screen roll animation */
+.dice-anim { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 85; }
+.die-roll { width: 160px; height: 160px; filter: drop-shadow(0 8px 24px rgba(0,0,0,0.6)); }
+.die-roll .die-svg { width: 160px; height: 160px; }
+.die-roll .die-svg polygon { fill: var(--accent); stroke: var(--gold-2); stroke-width: 4; stroke-linejoin: round; }
+.die-roll .die-num { fill: #fff; font: 800 30px var(--font); }
+.die-roll.spinning { animation: dieSpin 0.5s linear infinite; }
+.die-roll.settled { animation: diePop 0.45s ease; }
+@keyframes dieSpin { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(180deg) scale(1.12); } 100% { transform: rotate(360deg) scale(1); } }
+@keyframes diePop { 0% { transform: scale(1.35); } 55% { transform: scale(0.9); } 100% { transform: scale(1); } }
 .chat-input { display: flex; gap: 6px; }
 .chat-input input { flex: 1; }
 
