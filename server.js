@@ -115,9 +115,9 @@ const aiAvailableUsd = (u) => (entitledAI(u) ? Math.max(0, INCLUDED_AI_USD - aiC
 const trialActive = (u) => !!(u && u.trial_start && Date.now() - u.trial_start < TRIAL_MS);
 const trialEndsAt = (u) => (u && u.trial_start ? u.trial_start + TRIAL_MS : null);
 // Can this account run tables as a DM? Admins always; GMs during trial or on a paid plan.
-const entitledGM = (u) => !!(u && (u.role === "admin" || (u.role === "gm" && (u.plan === "gm" || u.plan === "gm_ai" || trialActive(u)))));
-// Can this account use the AI assistant? Admins always; the AI plan, or during trial.
-const entitledAI = (u) => !!(u && (u.role === "admin" || u.plan === "gm_ai" || trialActive(u)));
+const entitledGM = (u) => !!(u && (u.role === "admin" || (u.role === "gm" && (u.plan === "gm" || u.plan === "gm_ai" || u.plan === "comp" || trialActive(u)))));
+// Can this account use the AI assistant? Admins always; the AI/comp plans, or during trial.
+const entitledAI = (u) => !!(u && (u.role === "admin" || u.plan === "gm_ai" || u.plan === "comp" || trialActive(u)));
 // One-time migration: existing GM accounts (created before billing) get a fresh
 // 30-day trial start so the new gating never locks them out unexpectedly.
 try { store.listUsers().forEach((u) => { if (u.role === "gm") store.startTrial(u.id); }); } catch {}
@@ -838,7 +838,7 @@ io.on("connection", (socket) => {
   // Admin manually sets a billing plan (until Stripe is wired): null | 'gm' | 'gm_ai'.
   socket.on("adminSetPlan", ({ id, plan }) => {
     if (!isAdmin()) return socket.emit("adminError", "Admins only.");
-    if (![null, "", "gm", "gm_ai"].includes(plan)) return;
+    if (![null, "", "gm", "gm_ai", "comp"].includes(plan)) return;
     if (!store.getUserById(id)) return;
     store.setPlan(id, plan || null);
     socket.emit("adminUserList", userListPayload());

@@ -281,6 +281,7 @@ socket.on("adminUserList", (users) => {
           <option value=""${!u.plan ? " selected" : ""}>Plan: trial / none</option>
           <option value="gm"${u.plan === "gm" ? " selected" : ""}>Plan: GM ($5)</option>
           <option value="gm_ai"${u.plan === "gm_ai" ? " selected" : ""}>Plan: GM + AI ($10)</option>
+          <option value="comp"${u.plan === "comp" ? " selected" : ""}>Plan: Free (comp)</option>
         </select>
         <button class="acct-credit btn-secondary" title="Grant AI top-up credit (USD)">+ AI credit</button>
         ${locked ? '<span class="ar-meta">owner account — managed by the owner only</span>'
@@ -347,7 +348,8 @@ function renderAiMeter(used, included, credit) {
 // Short billing status for the admin accounts list.
 function billingLabel(u) {
   let plan;
-  if (u.plan === "gm_ai") plan = "💳 Plan: GM + AI ($10)";
+  if (u.plan === "comp") plan = "🎁 Free access (comp)";
+  else if (u.plan === "gm_ai") plan = "💳 Plan: GM + AI ($10)";
   else if (u.plan === "gm") plan = "💳 Plan: GM ($5)";
   else if (u.trialActive && u.trialEndsAt) {
     const d = Math.max(0, Math.ceil((u.trialEndsAt - Date.now()) / 86400000));
@@ -355,7 +357,7 @@ function billingLabel(u) {
   } else if (u.trialEndsAt) plan = "Trial ended — no plan";
   else plan = "No plan / trial";
   // Append AI usage for accounts that can use it.
-  if (u.plan === "gm_ai" || u.trialActive) {
+  if (u.plan === "gm_ai" || u.plan === "comp" || u.trialActive) {
     plan += ` · AI $${(u.aiUsed || 0).toFixed(2)}/$${(u.aiIncluded || 0).toFixed(2)}`;
     if (u.aiCredit > 0) plan += ` (+$${u.aiCredit.toFixed(2)} credit)`;
   }
@@ -388,6 +390,7 @@ function renderTrialBanner(user) {
   if (!el) return;
   el.className = "trial-banner hidden";
   if (!user || user.role !== "gm") return; // players & admins don't need it
+  if (user.plan === "comp") { el.textContent = "🎁 You have free access — all Game Master + AI features, on the house. Enjoy!"; el.className = "trial-banner ok"; return; }
   if (user.plan === "gm_ai") { el.textContent = "✓ Game Master + AI plan active. Thanks for supporting the table!"; el.className = "trial-banner ok"; return; }
   if (user.plan === "gm") { el.innerHTML = '✓ Game Master plan active. Add the AI assistant any time — <a href="/pricing.html" target="_blank">see plans</a>.'; el.className = "trial-banner ok"; return; }
   if (user.trialActive && user.trialEndsAt) {
