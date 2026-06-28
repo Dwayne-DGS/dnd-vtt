@@ -7,7 +7,7 @@ import { Server } from "socket.io";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { randomUUID, randomBytes } from "crypto";
-import { createWriteStream, mkdirSync, readFileSync, existsSync } from "fs";
+import { createWriteStream, mkdirSync, readFileSync, writeFileSync, existsSync } from "fs";
 import bcrypt from "bcryptjs";
 import { rollDice } from "./dice.js";
 import * as store from "./db.js";
@@ -1121,6 +1121,47 @@ io.on("connection", (socket) => {
     }
   });
 
+  // --- AI map generation (DM only, metered like the AI assistant) ----------
+  socket.on("generateMap", async ({ prompt, use }) => {
+    if (!roomId || !amDM()) return;
+    if (!imageGenConfigured()) return socket.emit("mapGenError", "AI map generation isn't set up on this server yet.");
+    const desc = String(prompt || "").trim().slice(0, 300);
+    if (!desc) return socket.emit("mapGenError", "Describe the map you want first.");
+    const me = socket.user ? store.getUserById(socket.user.id) : null;
+    if (!entitledAI(me)) return socket.emit("mapGenError", "✨ AI map generation is part of the GM + AI plan. Upgrade (or start your free trial) to use it.");
+    if (me.role !== "admin" && aiAvailableUsd(me) < IMAGE_COST_USD) {
+      return socket.emit("mapGenError", `That would exceed this month's included AI ($${INCLUDED_AI_USD.toFixed(2)}). Add AI credit, or wait for next month's reset.`);
+    }
+    const now = Date.now();
+    if (now - aiLast < 3000) return socket.emit("mapGenError", "Please wait a few seconds between AI requests.");
+    aiLast = now;
+    socket.emit("mapGenBusy");
+    const t0 = Date.now();
+    try {
+      const url = await generateMapImage(desc);
+      const name = desc.slice(0, 40);
+      const id = randomUUID();
+      store.saveMapEntry(id, roomId, name, url); // add to the shared library
+      io.emit("mapSaved", { id, name, url });
+      socket.emit("mapGenDone", { url, name, use: !!use }); // client reuses setMap to go live
+      console.log(`[mapgen] "${desc}" -> ${url} in ${Date.now() - t0}ms`);
+      // Charge the estimated image cost to this account's monthly meter (admins exempt).
+      if (me.role !== "admin") {
+        const period = aiMonth();
+        const prevCost = me.ai_period === period ? (me.ai_cost || 0) : 0;
+        const prevUsed = me.ai_period === period ? (me.ai_used || 0) : 0;
+        const newCost = prevCost + IMAGE_COST_USD;
+        const spilled = Math.max(0, newCost - INCLUDED_AI_USD) - Math.max(0, prevCost - INCLUDED_AI_USD);
+        const newCredit = Math.max(0, (me.ai_credit || 0) - spilled);
+        store.setAiMeter(me.id, newCost, newCredit, prevUsed + 1, period);
+        socket.emit("aiUsage", { used: Math.min(newCost, INCLUDED_AI_USD), included: INCLUDED_AI_USD, credit: newCredit });
+      }
+    } catch (e) {
+      console.log(`[mapgen] ERROR ${e.message} in ${Date.now() - t0}ms`);
+      socket.emit("mapGenError", e.message || "Map generation failed.");
+    }
+  });
+
   // --- Saved maps — shared library, DM only --------------------------------
   // Broadcast library changes to ALL clients (every room) so the shared library
   // stays consistent everywhere.
@@ -1378,6 +1419,63 @@ async function callClaude({ system, prompt, tool }) {
   }
   const text = (data.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n").trim();
   return { value: text, usage };
+}
+
+// ---------------------------------------------------------------------------
+//  AI map generation. Claude can't make images, so this uses a separate image
+//  API (OpenAI's Images API by default). The key lives in `image.key` (kept out
+//  of git) or the OPENAI_API_KEY / IMAGE_API_KEY env var. If absent, the feature
+//  is simply disabled and the UI says so. Each generated image is saved into the
+//  same /uploads dir as uploaded maps, so it flows through the normal map library.
+// ---------------------------------------------------------------------------
+const IMAGE_KEY_FILE = join(__dirname, "image.key");
+const IMAGE_MODEL = process.env.IMAGE_MODEL || "gpt-image-1";
+const IMAGE_API_URL = process.env.IMAGE_API_URL || "https://api.openai.com/v1/images/generations";
+const IMAGE_SIZE = process.env.IMAGE_SIZE || "1536x1024"; // landscape, good for battle maps
+// Estimated API cost per generated image, charged to the GM's monthly AI meter.
+const IMAGE_COST_USD = Number(process.env.IMAGE_COST_USD || 0.08);
+function imageKey() {
+  try {
+    if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY.trim();
+    if (process.env.IMAGE_API_KEY) return process.env.IMAGE_API_KEY.trim();
+    return existsSync(IMAGE_KEY_FILE) ? readFileSync(IMAGE_KEY_FILE, "utf8").trim() : null;
+  } catch { return null; }
+}
+const imageGenConfigured = () => !!imageKey();
+async function generateMapImage(description) {
+  const key = imageKey();
+  if (!key) throw new Error("AI map generation isn't set up on this server yet.");
+  const prompt =
+    `Top-down overhead view tabletop RPG battle map: ${description}. ` +
+    `Detailed digital painting, clear walkable terrain, consistent lighting, ` +
+    `no text, no labels, no grid lines, no characters, no tokens, no UI.`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 90000); // image gen is slow
+  let r;
+  try {
+    r = await fetch(IMAGE_API_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "content-type": "application/json" },
+      body: JSON.stringify({ model: IMAGE_MODEL, prompt, n: 1, size: IMAGE_SIZE }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("Image generation took too long. Try again.");
+    throw new Error("Couldn't reach the image service: " + e.message);
+  } finally { clearTimeout(timer); }
+  if (!r.ok) {
+    const t = await r.text().catch(() => "");
+    if (r.status === 401) throw new Error("Image API key was rejected — check image.key.");
+    if (r.status === 429) throw new Error("Image API is rate-limited or out of credit. Try again shortly.");
+    throw new Error(`Image generation failed (${r.status}). ${t.slice(0, 160)}`);
+  }
+  const data = await r.json();
+  const b64 = data && data.data && data.data[0] && data.data[0].b64_json;
+  if (!b64) throw new Error("Image service returned no image.");
+  mkdirSync(UPLOAD_DIR, { recursive: true });
+  const fname = `${randomUUID()}.png`;
+  writeFileSync(join(UPLOAD_DIR, fname), Buffer.from(b64, "base64"));
+  return `/uploads/${fname}`;
 }
 
 function mapCharacter(c, owner) {

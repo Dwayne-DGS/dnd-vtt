@@ -8,6 +8,8 @@ export function initFinder(socket) {
   const title = document.getElementById("finder-title");
   const input = document.getElementById("finder-q");
   const results = document.getElementById("finder-results");
+  const aiBtn = document.getElementById("finder-ai");
+  const note = document.getElementById("finder-note");
   if (!overlay) return;
   let kind = "maps";
   let pending = null; // safety timeout so the spinner never hangs forever
@@ -16,6 +18,13 @@ export function initFinder(socket) {
     kind = k;
     title.textContent = k === "sounds" ? "Find music & sound effects" : "Find maps";
     results.innerHTML = '<p class="muted">Describe what you want, then Search. Results are Creative-Commons licensed.</p>';
+    // AI map generation only makes sense for maps.
+    if (aiBtn) aiBtn.classList.toggle("hidden", k !== "maps");
+    if (note) {
+      note.textContent = k === "maps"
+        ? "Search free Creative-Commons maps, or use “Generate with AI” to create a brand-new map from your description (counts toward your AI budget)."
+        : "Results come from Creative-Commons libraries (Openverse). Each shows its license — some require crediting the creator. Preview, then add to your table.";
+    }
     overlay.classList.remove("hidden");
     input.value = ""; input.focus();
   }
@@ -30,6 +39,18 @@ export function initFinder(socket) {
       results.innerHTML = '<p class="muted">The search service is taking too long to respond. Try again, or try shorter words.</p>';
     }, 20000);
   }
+
+  function generate() {
+    const q = input.value.trim();
+    if (!q) { input.focus(); return; }
+    clearTimeout(pending);
+    results.innerHTML = '<p class="muted">✨ Generating your map with AI — this can take 20–40 seconds…</p>';
+    socket.emit("generateMap", { prompt: q, use: false });
+    pending = setTimeout(() => {
+      results.innerHTML = '<p class="muted">Still working… if nothing appears, the image service may be slow. Try again in a moment.</p>';
+    }, 90000);
+  }
+  aiBtn?.addEventListener("click", generate);
 
   document.getElementById("find-maps")?.addEventListener("click", () => open("maps"));
   document.getElementById("find-sounds")?.addEventListener("click", () => open("sounds"));
@@ -68,5 +89,24 @@ export function initFinder(socket) {
       }
       results.appendChild(card);
     });
+  });
+
+  // --- AI map generation results ---
+  socket.on("mapGenBusy", () => { /* spinner already shown by generate() */ });
+  socket.on("mapGenError", (msg) => { clearTimeout(pending); results.innerHTML = `<p class="muted">${esc(msg || "Map generation failed.")}</p>`; });
+  socket.on("mapGenDone", ({ url, name }) => {
+    clearTimeout(pending);
+    if (kind !== "maps") return;
+    results.innerHTML = "";
+    const card = document.createElement("div");
+    card.className = "finder-card";
+    card.innerHTML =
+      `<img class="finder-thumb" src="${esc(url)}" alt="" />` +
+      `<div class="finder-info"><div class="finder-title-t">${esc(name || "AI map")}</div>` +
+      `<div class="finder-meta">Generated with AI · already saved to your map library</div>` +
+      `<div class="finder-acts"><button class="fa-use">Use now</button><button class="fa-again btn-secondary">Generate another</button></div></div>`;
+    card.querySelector(".fa-use").addEventListener("click", () => { socket.emit("setMap", url); });
+    card.querySelector(".fa-again").addEventListener("click", generate);
+    results.appendChild(card);
   });
 }

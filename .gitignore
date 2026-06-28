@@ -32,3 +32,4 @@ install-on-server.sh
 
 # OS noise
 .DS_Store
+image.key
