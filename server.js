@@ -1138,19 +1138,20 @@ io.on("connection", (socket) => {
     socket.emit("mapGenBusy");
     const t0 = Date.now();
     try {
-      const url = await generateMapImage(desc);
+      const { url, usage } = await generateMapImage(desc);
+      const cost = imageCostFromUsage(usage); // real measured cost (buffered, floored)
       const name = desc.slice(0, 40);
       const id = randomUUID();
       store.saveMapEntry(id, roomId, name, url); // add to the shared library
       io.emit("mapSaved", { id, name, url });
       socket.emit("mapGenDone", { url, name, use: !!use }); // client reuses setMap to go live
-      console.log(`[mapgen] "${desc}" -> ${url} in ${Date.now() - t0}ms`);
-      // Charge the estimated image cost to this account's monthly meter (admins exempt).
+      console.log(`[mapgen] "${desc}" -> ${url} cost $${cost.toFixed(4)} in ${Date.now() - t0}ms`);
+      // Charge the actual image cost to this account's monthly meter (admins exempt).
       if (me.role !== "admin") {
         const period = aiMonth();
         const prevCost = me.ai_period === period ? (me.ai_cost || 0) : 0;
         const prevUsed = me.ai_period === period ? (me.ai_used || 0) : 0;
-        const newCost = prevCost + IMAGE_COST_USD;
+        const newCost = prevCost + cost;
         const spilled = Math.max(0, newCost - INCLUDED_AI_USD) - Math.max(0, prevCost - INCLUDED_AI_USD);
         const newCredit = Math.max(0, (me.ai_credit || 0) - spilled);
         store.setAiMeter(me.id, newCost, newCredit, prevUsed + 1, period);
@@ -1432,8 +1433,24 @@ const IMAGE_KEY_FILE = join(__dirname, "image.key");
 const IMAGE_MODEL = process.env.IMAGE_MODEL || "gpt-image-1";
 const IMAGE_API_URL = process.env.IMAGE_API_URL || "https://api.openai.com/v1/images/generations";
 const IMAGE_SIZE = process.env.IMAGE_SIZE || "1536x1024"; // landscape, good for battle maps
-// Estimated API cost per generated image, charged to the GM's monthly AI meter.
-const IMAGE_COST_USD = Number(process.env.IMAGE_COST_USD || 0.08);
+// Per-image cost. We charge the REAL cost measured from the API's token usage,
+// but never less than this floor — so we can never accidentally undercharge a GM
+// and eat the OpenAI bill ourselves. (gpt-image-1 token prices, USD per token.)
+const IMAGE_COST_USD = Number(process.env.IMAGE_COST_USD || 0.08); // safety floor / pre-flight estimate
+const IMG_PRICE_TEXT_IN = Number(process.env.IMG_PRICE_TEXT_IN || 5 / 1e6); // text input tokens
+const IMG_PRICE_IMG_IN = Number(process.env.IMG_PRICE_IMG_IN || 10 / 1e6); // image input tokens (edits)
+const IMG_PRICE_IMG_OUT = Number(process.env.IMG_PRICE_IMG_OUT || 40 / 1e6); // generated image tokens
+// Safety multiplier so price drift / rounding never leaves us short. 1.1 = +10% buffer.
+const IMG_COST_MULT = Number(process.env.IMG_COST_MULT || 1.1);
+function imageCostFromUsage(u) {
+  if (!u) return IMAGE_COST_USD;
+  const det = u.input_tokens_details || {};
+  const textIn = Number(det.text_tokens ?? u.input_tokens ?? 0);
+  const imgIn = Number(det.image_tokens ?? 0);
+  const out = Number(u.output_tokens ?? 0);
+  const raw = textIn * IMG_PRICE_TEXT_IN + imgIn * IMG_PRICE_IMG_IN + out * IMG_PRICE_IMG_OUT;
+  return Math.max(IMAGE_COST_USD, raw * IMG_COST_MULT); // measured (buffered), but never below the floor
+}
 function imageKey() {
   try {
     if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY.trim();
@@ -1475,7 +1492,7 @@ async function generateMapImage(description) {
   mkdirSync(UPLOAD_DIR, { recursive: true });
   const fname = `${randomUUID()}.png`;
   writeFileSync(join(UPLOAD_DIR, fname), Buffer.from(b64, "base64"));
-  return `/uploads/${fname}`;
+  return { url: `/uploads/${fname}`, usage: data.usage || null };
 }
 
 function mapCharacter(c, owner) {
